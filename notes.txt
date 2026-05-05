@@ -1,0 +1,48 @@
+So an embedding model takes text that you give and converts it into an n-dimensional vector. The vector is such that vectors for text snippets with similar content/meaning are placed closer to each other. For visualization, if we have 4 sentences:
+1. I like Biryani.
+2. Bumrah bowls a yorker.
+3. This restaurant has got the best Biryani in town.
+4. The batsman could not anticipate the slow yorker.
+
+Suppose when we pass these 4 vectors in the embedding model and it gives vectors A, B, C and D for sentences 1, 2, 3 and 4 respectively.
+A good embedding model will place vectors A and C closer to each other than A and B or A and D. It place vectors B and D closer than B and C or B and A.
+You can lookup how the embedding model achieves that [here]
+
+Now we need to have a stronger definition on what do we mean when we say that A and C are closer to each other than A and B or A and D.
+
+Suppose you have these 4 vectors in a 3D space and they are placed as shown. Looking at it, you can say that A and C are close to each other and so are B and D. But how do we quantitively define that. One thing we can do is we can measure the Euclidian distance between the points at which these vectors land. The shorter the distance, more similar are the vectors, right? Wrong! Look at this figure, here A and B are small vectors opposite to each other, and C is a vector pointing in the same direction as A, but is much longer.
+
+Going with Euclidean distance as our measure, it'll say that A and B are closer to each other than A and C, which is wrong, cause A and B mean opposite things, while A and C are similar to each other.
+
+So not Euclidean distance.
+
+If you are among the mathy people reading this, you may also think of using dot product for measuring similarity. Well, it's a good idea in principle, what happens if one of your vectors is of much higher magnitude than all others? Then the dot product of that vector with every other vector will be essentially + or - infinity(based on their direction), thus it'll always be first of last in the queue.
+Read footnote [1]
+
+So we go with Cosine similarity. It works like this:
+It'll measure the angle between the vectors, smaller the angle, similar the meaning. In practice, this works out.
+
+How do we calculate it? cos theta = A dot B/|A|*|B|. Higher the value of cos theta, smaller is theta.
+Hence higher cos theta means that A and B are similar. Note that if 2 texts mean opposite things, like "I liked this movie" and "I did not like this movie", the vectors associated to these texts are not placed opposite to each other, on the contrary, they are placed close to each other.
+
+Going with an embedding model, if we pass our 4 sentences to it, we get 4 vectors. Following matrix shows the cosine similarity of each vector with the other 3:
+
+  A       B         C         D
+A 1       0.2126    0.6441    0.0022
+B 0.2126  1         0.2828    0.3030
+C 0.6441  0.2828    1         -0.0484
+D 0.0022  0.3030    -0.0484   1
+
+Notice how the matrix is symmetric, this is because cosine similarity is commutative, cos_sim(A, B) = cos_sim(B, A). Also notice how the diagonal elements of the matrix are exactly 1, this is because cosine similarity of 2 identical vectors is 1.
+
+This matrix cleary shows us that A and B are closer together than A and C.
+
+Now let's look at how do we use this information:
+If I were to create a search functionality, and someone types in A in the search box, I'll rank B higher than C, as B is more similar to A.
+
+
+
+
+
+Footnotes
+[1] Most embedding models used in production thesedays normalize their output ectors such that length of the vector is always 1. Thus, the value of cosine similarity and dot product will be exactly same, and the ordering created by cosine similarity and Euclidean distance similarity will also be exactly same

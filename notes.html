@@ -1,0 +1,126 @@
+<h3>How do LLMs work?</h3>
+
+<p>
+At there core, LLMs are number predictors. You may have heard that they are next word predictors, fancy autocompletes, magic boxes, etc. Yes, they are, but at their core, they are number predictors.
+</p>
+
+<p>
+Suppose you work at a weather API company, and you create a model that predicts tomorrow's temperature. That model has seen weather data for past many years, and based on the data, it looks at last week's temperatures, let's say they are 33, 35, 32, 38, 36 and 32 degree celcius, and your model says that there's a 60% chance that tomorrow's temperature is 34 degree, 20% chance that it's 39 degree, etc.
+</p>
+
+<p>
+This is exactly how LLMs work too!
+</p>
+
+<p>
+Let's say we have an enormous corpus of words made up of words: [of, the, Vikram, class, is, in, lazy, tallest, home, a]
+The text looks something like this:
+<br>
+Vikram is the ...
+</p>
+
+Let's randomly assign words to those numbers
+<ul>
+  <li>31: of</li>
+  <li>32: the</li>
+  <li>33: Vikram</li>
+  <li>34: class</li>
+  <li>35: is</li>
+  <li>36: in</li>
+  <li>37: lazy</li>
+  <li>38: tallest</li>
+  <li>39: home</li>
+  <li>40: a</li>
+</ul>
+
+<p>
+And replace every word in the text corpus with its corresponding word
+Now our text looks like 33 35 32...
+</p>
+
+<p>
+All that we do now is treat these numbers as the "past year's temperature data" like we did in the weather API, and create a model that predicts what's the tomorrow's temperature, a.k.a., the next number. Let's say we get the response from model that it's 60% chance that the next number is 34, 20% chance that it's 39, etc.
+</p>
+
+<p>
+If you've been following carefully, it's saying the same thing as, "It's 60% chance that the next word is <i>class</i>, 20% chance that the next number is <i>home</i>, etc"
+</p>
+
+<p>
+  <i>What? It's that easy?</i> Yes it is!
+</p>
+
+<p>
+To recap clearly, here's what we do:
+<ul>
+  <li>
+Write each word from text corpus as a number, that's our dataset
+  </li>
+  <li>
+Create a model that when given a sequence of numbers, predicts what the next number will be(more precisely, the probability of each number to be the next number) based on the numbers from the dataset
+  </li>
+  <li>
+    This is s crucial step:
+Based on the probabilities it sees, it does not simply pick the number with the highest probability. It randomly generates a number from the distribution based on it's probability. Here, it's 60% probability that the number will be 34, 20% probability that the number will be 39.
+  </li>
+  <li>
+    Convert the number back to the word and present that word as the output. Here, if the random number picked was 34, it'll output <i>class</i> as the answer.
+  </li>
+</ul>
+</p>
+
+
+<p>
+  <i>But don't LLMs write entire paragraphs when given a simple prompt?</i>
+</p>
+
+<p>
+  Yes, they certainly do, but before we go to that, try to come up yourself with the idea of how do they do that, based on the single word predictor that we just built.
+</p>
+
+<p>
+  Without going too much into detail, here are two things that go into creating fully working LLMs from our next word predictor:
+</p>
+<ol>
+<li>
+  Say the current sentence is "Today's weather". We run the model once, and append the output we got to the sentence, so our sentence becomes "Today's weather is". We then feed this newly generated sentence back into the model, so the sentence becomes "Today's weather is nice". Do that a lot more times, and you have your paragraph. LLMs literally get a text sample, predict next word, attach it to the text sample, predict next word, and so on. That's why on ChatGPT's website, you see one word come at a time.
+  <br>You can see a visual representation of it below:<br>
+  <img alt="Next word prediction loop">
+  <br>
+  This process is continued until we encounter an end symbol, which is our next point.
+</li>
+<li> There is a special word in our vocabulary now, called <|end|>. It has occurred a lot of times in our text corpus, and when our model predicts that the next word is <|end|>, it knows that it's time to stop now. That symbol isn't shown to the user, it's just for our code to know that it's time to end the word prediction loop. A visualizaion of it is shown below:<br>
+    <img alt="Next word prediction with <|end|> symbol"><br>
+    <img alt="ChatGPT UI showing response without <|end|>">
+<br>
+In code, it's implemented like this:<br>
+<pre>
+<code>
+text = "Today's weather"
+while(True):
+  next_word = predict_next_word(text)
+  if next_word != "<|end|>":
+    text += next_word
+  elif next_word == "<|end|>":
+    break
+return text
+</code>
+</pre>
+</li>
+  <li>
+    Last thing before we wrap<br>
+    <i>But LLMs answer the questions I ask them, not predict the next word.</i><br>
+    This is achieved by something called system prompt.<br>
+    When you ask LLM, "Write a poem in 10 lines", what's passed to the <i>Next Word Predicting Loop</i> is something like following:<br><br>
+    <pre>
+    This is a conversation between an AI assistant and a user.
+    User: Write a poem in 10 lines
+    AI Assistant:
+    </pre>
+    And if you can guess, the autocomplete loop will write a poem as a response to this. Here's a visualization for it:<br>
+    <img alt="Internal loop autocomplete with system prompt"><br>
+    <img alt="ChatGPT UI showing writing the poem">
+
+
+
+</ol>
