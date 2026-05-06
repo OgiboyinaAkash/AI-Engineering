@@ -1,0 +1,52 @@
+LLM output generation
+- LLMs at their core are next-token predictors.
+- LLM takes user input and converts them into tokens (Easy to work on token ids than direct text)
+- These tokens are passed through a neural network (a transformer).
+- It predicts a probability distribution over possible next tokens
+- It picks one token, appends it, and repeats
+
+Context Window
+- model’s short-term memory.
+- It’s the maximum number of tokens the model can consider at once
+- Includes:
+    - prompt
+    - previous conversations
+    - its own generated output
+- Old tokens get dropped when you exceed the context window limit
+
+Temperature 
+- It controls randomness in token selection.
+- Low Temperature (0.1-0.3)
+    - picks highest probability tokens
+    - more deterministic
+- Medium Temperature (~0.7)
+    - balanced creativity
+- High Temperature (>1)
+    - higher chance of unusual or incorrect outputs
+
+Non determinism
+- Even with same input LLM can generate differnt output
+- As model samples from a probability distribution
+- 2 tokens may have same probability 
+- a differnt token can affect the next tokens as the probabilities differ
+- thus produces a differnt output
+
+RAG
+- Problem: LLMs tend to hallucinate and give black box reasoning
+    - R-Retrieval
+    - A-Augmentation
+    - G-Generation
+
+- Retrieve relevant information from querying external sources —> Augment with pre-trained knowledge —> Generate response
+ 
+- Data indexing
+- Extract text from documents and transform them into vector embeddings. This preserves semantic meaning by assigning similar embedding values to co-related words. Suppose the words king and queen are correlated, so if the word king has a vector embedding [0.15 0.55  0.95], then the word queen would have an embedding that is very close to it, like [0.13  0.57  0.94]. It forms our retrieval Database.
+
+- Data Retrieval and Generation
+- The user's query is transformed into an embedding using the same model as earlier, and now Euclidean distance is calculated with the vectors in the database, and the closest ones are chosen to augment with the pretrained knowledge to generate the response.
+
+In Neural Networks
+- The first layer will be an embedding layer where these text are converted into a vector using a embedding model (Ex. Word2Vec)
+- the ouput of this layer will be passed to the next layer which is the first layer of hidden layers.
+- the outputs of each hidden layer will be passed as an input of next hidden layer.
+- at last there is an ouput layer which genrates our output
