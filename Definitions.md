@@ -121,7 +121,21 @@ Embedding Models - OpenAI,Cohere and open-source
     - **Computational :**
         - require calculation, aggregation, or structured filtering to produce an answer. They must be translated from natural language into a structured query language.
         - Decompose the query: Retrieve relevant data and then perform a calculation on the subset of retrieved documents.
-    
+- **Recall** (to retrieve a larger set of relevant results) and **Precision** (to reduce the number of irrelevant results)
+    - Recall increasing methods:
+        - **Query expansion :**
+            - broadens the query by adding additional tokens or phrases related to the original query terms as synonyms or abbreviations or they may be obtained using the stemming(cutting down words like berry and berries to berri) and spelling correction.
+            - Ex. if the query "ip lawyer" originally retrieves documents containing "ip" AND "lawyer", an expanded query using synonyms would retrieve documents containing ("ip" OR “intellectual property”) AND ("lawyer" OR "attorney")
+        - **Query relaxation :**
+            - removing or optionalizing tokens that may not be necessary to ensure relevance.
+            - Ex. a search for cute fluffy kittens might return results that only match fluffy kittens
+    - Precision increasing methods:
+        - **Query segmentation :**
+            - process of breaking down a user's search query into smaller, semantically meaningful units or phrases
+            - Ex.  Treating the segment "dress shirt" in the query "white dress shirt" as a quoted phrase, i.e., rewriting the query as **white “dress shirt”** can avoid matches for white shirt dresses.
+        - **Query Scoping :**
+            - scoping, or restricting how different parts of the query match different parts of documents
+
 
 **Neural Networks**
 - The first layer will be an embedding layer where these text are converted into a vector using a embedding model (Ex. Word2Vec)
