@@ -54,6 +54,27 @@
     - It leverages knowlegedge like weights, feautures and patterns gained from solving one problem to improve generalization on another.
 - Pre-trained model instead of training from scratch just trained further on a smaller, specialized dataset to adapt for a specific task.
 
+When to use which (RAG vs Fine Tuning)
+- RAG : You need to answer questions about rapidly changing data, require factual accuracy, or need to cite sources.
+- Fine-tuning : You need to change the model's tone, structure, or behavior (e.g., to output only JSON), or to master a specific task that doesn't change frequently
+
+Why RAG is dominant production pattern for knowledge-grounded application?
+- It separates knowledge from model weights, allowing systems to access live, private data without costly, slow, and infrequent retraining. It solves the core enterprise need for factual reliability, reducing hallucinations by anchoring LLM responses in trusted, retrieved documents
+
+Why Fine Tuning is typically impractical for product teams without training infrastructure.
+- It transforms a software engineering problem into a resource-intensive, specialized research project. While API-based fine-tuning exists, internal or advanced fine-tuning requires significant GPU resources, expert knowledge, and data engineering that standard product teams lack.
+
+Costs, Maintenece and Recency (RAG vs Fine Tuning)
+- Costs
+    - RAG needs minimal training so low upfront costs but high operational cost as retrieval is involved.
+    - Fine Tuning rewuired data prep, labelling and Gpu compute so has high upfront cost but low operational cost.
+- Maintence
+    - Lower for RAG as updating the vector database is easy
+    - Higher for Fine tuning as it requires continous retraining as information changes.
+- Recency
+    - Instant for RAG as it can access real-time data immediately
+    - Delayed for Fine Tuning as model is frozen in time until re-trained.
+
 **Chunking**
 - preprocessing technique of breaking large documents into smaller, manageable segments
 - Effective chunking balances semantic coherence keeping relevant information together with performance constraints
@@ -68,6 +89,39 @@
     - **Semantic chunking:**
         - Text-segmentation technique that divides documents based on meaning—rather than fixed character counts—by detecting topic shifts between sentences, often using vector embeddings.
         - It creates highly coherent, context-aware chunks, making retrieved context is semantically relevant.
+
+    - Chunk overlap
+        - Technique that shares a small, common portion of text between consecutive chunks. It ensures that semantic meaning and context are not lost if important information is split across boundaries, improving retrieval accuracy
+
+    - Chunk size vs retrival quality and context coherence
+        - Too small of a chunk breaks logical connections, resulting in confusing answers. 
+        - Too large of a chunk can exceed token limits or overwhelm the model with irrelevant data, reducing accuracy
+        - balanced chunk size is required to ensure retrival quality is good
+
+Embedding Models - OpenAI,Cohere and open-source
+- OpenAI for English-dominant applications, ease of implementation, and high-performance search.
+- Cohere for multi-language platforms, semantic search, and handling messy, real-world text (RAG).
+-  Best for data sovereignty, offline applications, or reducing long-term API expenses.
+
+**Retrieval Patterns**
+- **Top-k :** identifies the k number of chunks that are most similar to a user's query, ranked by relevance.
+    - The system calculates the semantic similarity between the query embedding and the embeddings of all potential source documents. It then selects the k highest-ranked items, regardless of their absolute relevance score
+    - Guaranteed to return results (up to k), efficient using algorithms like max-heap but can return irrelevant, poor-quality matches if the query doesn't strongly match any document
+    - used  when you need a set number of contexts
+- **Similarity Thresholding :** quality filter, setting a minimum required similarity score for a document to be considered relevant.
+    - It compares the document's relevance score to a set value. Any document falling below this score is discarded, even if it would have fit within a top-k cutoff.
+    - Reduces false positives and filters out low-quality noise but  requires careful tuning and a threshold too high may return empty results; too low may return irrelevant content.
+    - used  when accuracy is more important than the amount of context provided.
+
+**Query Rewriting**  
+- Query types:
+    - **Retrieval :**
+        - user's intent here is information retrieval, handled by retrieval algorithms, like lexical and vector search.
+        - Optimize the query's text to improve lexical or vector matching.
+    - **Computational :**
+        - require calculation, aggregation, or structured filtering to produce an answer. They must be translated from natural language into a structured query language.
+        - Decompose the query: Retrieve relevant data and then perform a calculation on the subset of retrieved documents.
+    
 
 **Neural Networks**
 - The first layer will be an embedding layer where these text are converted into a vector using a embedding model (Ex. Word2Vec)
