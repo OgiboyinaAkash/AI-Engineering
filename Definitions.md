@@ -43,6 +43,13 @@
   
 **Stale Knowledge**
 - Models produce outdated, inaccurate information because their training data, which acts like a fixed textbook, does not reflect current reality. It causes confident but incorrect answers, as AI lacks internal mechanisms to check if information has expired. This leads to high, costly hallucination rates.
+- In real systems, this appears as:
+    - outdated pricing or product information
+    - old company policies or regulations
+    - expired APIs or deprecated software libraries
+    - obsolete medical or legal guidance
+    - incorrect current events or leadership information
+    - recommending discontinued products or services
 
 **Embeddings**
 - Embeddings are numerical representations of data converted into vectors that capture semantic meaning and relationships in a dense space. They enable AI models to understand relationships by calculating the spatial distance between items.
