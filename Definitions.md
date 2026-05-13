@@ -174,6 +174,65 @@ Embedding Models - OpenAI,Cohere and open-source
     - **External Knowledge Bases :**
         - Connecting the model to external knowledge bases containing information about the real world.
 
+**ChromaDB and Pinecone**
+- They both are vector databases used in RAG and semantic search. They store embeddings (dense vectors) and allow similarity search.
+    - ChromaDB: open-source vector database designed for local-first AI applications
+        - collection: similar to a table in SQL. It stores embeddings, documents, metadata and ID's.
+        - indexing: embeddings are generated, vectors are indexed and metadata stored alongside.
+        - querying: query converted to embedding, similarity search performed and closest vectors returned.
+        - Persistence: stores data on disk. Instead of client=chromadb.Client() where data stays only in the memory we use client=chromadb.PersistenceClient(path='./chroma_db').
+    - Pinecone: fully managed hosted vector database.
+        - indexes: index contains vectors and supports similarity search.
+        - indexing: uploads vectors directly. Expects you to generate embeddings externally unlike chromadb where it's done internally.
+        - querying: Approximate Nearest Neighbor (ANN) search, highly optimized retrieval and distributed querying.
+        - Persistence: automatic because it is hosted.
+
+**Metadata filtering**
+- technique used in vector databases to refine search results by applying structured attribute filters alongside semantic vector search.
+- Structured key-value data (metadata) is attached to document chunks during ingestion.
+- Types:
+    - Comparison: Operators like equality, greater-than, or less-than.
+    - Logical: Operators such as AND, OR, NOT to combine conditions.
+
+**Sparse and Dense Retrieval**
+- **Sparse(keyword) :**
+    - Sparse retrieval methods like IF-IDF/BM25 represents text in higher dimensional vectors where most dimensions are zero, encoding the presence or absence of specific words.
+    - sparse approaches struggle with synonyms (“car” vs. “automobile”) or context-dependent meanings (“Apple” as a company vs. the fruit).
+    - can’t handle misspellings or paraphrased queries effectively. For example, a search for “how to fix a bike” might miss documents using “repair bicycle” because the overlapping keywords are limited. 
+
+- **Dense(vector) :**
+    - Models like BERT or Sentence Transformers uses neural networks to map text into lower-dimensional, continuous vectors that capture semantic meaning. These vectors are “dense” because every dimension contains a non-zero value, allowing similarities to be measured even when the exact keywords don’t match.
+    - Ideal for applications like chatbots or recommendation systems where user intent matters more than exact wording.
+
+**Bi-Encoder and Cross-Encoder**
+- search task with D documents and Q queries
+    - bi-encoding computed once for each document and query, and then re-used multiple times to cheaply compute pairwise relevance. Because embeddings are only computed once, its cost scales as D+Q
+    - cross-endcoding approach of computing every pairwise relevance is expensive; its cost scales as D*Q
+    - Bi-coders are fast and involve low cost but produce bad quality of output whereas Cross-Encoders are slow but produce very good quality output.
+    - To maintain balance between time, cost and quality a hybrid method is used, where we use bi-encoder to cheaply identify top candidates, and then use cross-encoder to expensively re-rank those top candidates. The cost of this hybrid approach scales as (D+Q) * cost of embedding + (N * Q) * cost of re-ranking, where N is the number of candidates re-ranked.
+
+**Recall@k :**
+- The proportion of relevant items found in the top K results out of all possible relevant items.
+    - Recall@k = Relevant items in top k / Total relevant items in the dataset.
+
+**Precision@k :**
+- The proportion of recommended items in the top K that are actually relevant.
+    - Precision@k = Relevant items in top k / k
+
+**Mean Reciprocal Rank(MRR) :**
+- The average of the reciprocal ranks of the first relevant document across multiple queries.
+
+**Normalized Discounted Cumulative Gain(NDCG) :**
+- A metric that accounts for the position of relevant items  and supports graded relevance.
+    - NDCG = DCG@k / IDCG@k
+    - Discounted Cumulative Gain normalized by the Ideal DCG
+
+AI-Agent
+- Software program that autonomously perceives its environment, makes decisions, and uses tools to achieve specific goals set by a human. Unlike passive, text-generating chatbots, AI agents actively plan, reason, and execute complex, multi-step workflows, such as managing calendars, conducting research, or handling IT tasks.
+
+ReAct
+- A prompting and design pattern for LLMs that alternates between thinking (Reasoning) and taking action (Acting) to solve complex, multi-step tasks. By combining chain-of-thought planning with external tool use (e.g., search APIs, databases), AI agents can observe results, update their understanding, and refine their actions iteratively until the goal is achieved 
+
 **Neural Networks**
 - The first layer will be an embedding layer where these text are converted into a vector using a embedding model (Ex. Word2Vec)
 - the ouput of this layer will be passed to the next layer which is the first layer of hidden layers.
