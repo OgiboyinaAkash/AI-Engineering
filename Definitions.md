@@ -127,7 +127,7 @@ Costs, Maintenece and Recency (RAG vs Fine Tuning)
         - Too large of a chunk can exceed token limits or overwhelm the model with irrelevant data, reducing accuracy
         - balanced chunk size is required to ensure retrival quality is good
 
-Embedding Models - OpenAI,Cohere and open-source
+Embedding Models - OpenAI, Cohere and open-source
 - OpenAI for English-dominant applications, ease of implementation, and high-performance search.
 - Cohere for multi-language platforms, semantic search, and handling messy, real-world text (RAG).
 -  Best for data sovereignty, offline applications, or reducing long-term API expenses.
@@ -228,13 +228,11 @@ Embedding Models - OpenAI,Cohere and open-source
     - Discounted Cumulative Gain normalized by the Ideal DCG
 
 AI-Agent
-- Software program that autonomously perceives its environment, makes decisions, and uses tools to achieve specific goals set by a human. Unlike passive, text-generating chatbots, AI agents actively plan, reason, and execute complex, multi-step workflows, such as managing calendars, conducting research, or handling IT tasks.
+- Software program that autonomously perceives its environment, makes decisions, and uses tools to achieve specific goals set by a human. Unlike passive, text-generating chatbots, AI agents actively plan, reason, and execute complex, multi-step workflows, such as managing calendars, conducting research, or handling IT tasks. Use of Agent is appropriate when the process is ambiguous or requires external information and overkill for simple, procedural, or deterministic workflows. Think → Use Tool → Observe → Think Again
 
 ReAct
-- A prompting and design pattern for LLMs that alternates between thinking (Reasoning) and taking action (Acting) to solve complex, multi-step tasks. By combining chain-of-thought planning with external tool use (e.g., search APIs, databases), AI agents can observe results, update their understanding, and refine their actions iteratively until the goal is achieved 
+- A prompting and design pattern for LLMs that alternates between thinking (Reasoning) and taking action (Acting) to solve complex, multi-step tasks. By combining chain-of-thought planning with external tool use (e.g., search APIs, databases), AI agents can observe results, update their understanding, and refine their actions iteratively until the goal is achieved.
+User Request --> Reason about next step --> Take an action/tool call --> Observe result --> Reason again --> Repeat until done
 
-**Neural Networks**
-- The first layer will be an embedding layer where these text are converted into a vector using a embedding model (Ex. Word2Vec)
-- the ouput of this layer will be passed to the next layer which is the first layer of hidden layers.
-- the outputs of each hidden layer will be passed as an input of next hidden layer.
-- at last there is an ouput layer which genrates our output
+Chain
+Predefined, fixed sequences of steps for predictable, linear workflow unlike agents which use LLM to dynamically decide actions and tool usage. Used when the task is predictable. Example: Input → Summarize → Translate → Output
