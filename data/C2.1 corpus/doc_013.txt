@@ -1,0 +1,2 @@
+Title: Ai Notes 01
+Neural networks learn patterns from data. Model capacity grows with more parameters.

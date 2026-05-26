@@ -1,0 +1,2 @@
+Title: Ai Notes 02
+Model capacity grows with more parameters. Validation data helps detect overfitting.

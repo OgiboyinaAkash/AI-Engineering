@@ -1,0 +1,2 @@
+Title: Ai Notes 03
+Validation data helps detect overfitting. Feature scaling can improve optimization.
