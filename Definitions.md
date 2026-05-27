@@ -60,6 +60,9 @@
 **Cosine similarity**
 - a metric used in Artificial Intelligence to measure how similar two data points are based on the angle between them rather than their magnitude.
 
+**FAISS**
+- Facebook AI Similarity Search (FAISS) is a library for efficient vector indexing and similarity search. It supports exact and approximate nearest neighbor search and is commonly used to build fast semantic search over embeddings.
+
 **RAG**
 - Problem : LLMs tend to hallucinate and give black box reasoning
 
