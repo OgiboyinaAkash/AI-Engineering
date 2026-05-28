@@ -1,0 +1,13 @@
+id,title,body,source,date,category,author
+c2_001,Python async concurrency,Python async programming keeps API calls non-blocking while handling many requests at once.,api/engineering-notes,2026-03-01,python,Alice
+c2_002,Java multithreading,Java multithreading handles concurrent API requests in worker threads.,api/engineering-notes,2026-03-02,java,Bob
+c2_003,ChromaDB persistence,A persistent ChromaDB client writes embeddings to disk so collections survive restarts.,vector-db/playbook,2026-03-03,vector_db,Chen
+c2_004,Pinecone hosted indexes,Pinecone is a hosted vector database with serverless indexes managed in the cloud.,vector-db/playbook,2026-03-04,vector_db,Dana
+c2_005,Metadata filtering,"Metadata filters on source, date, category, and author raise precision by removing off-topic chunks.",retrieval/guide,2026-03-05,retrieval,Alice
+c2_006,Hybrid search,Hybrid search combines sparse keyword retrieval with dense vector retrieval and reranks the merged candidates.,retrieval/guide,2026-03-06,retrieval,Eli
+c2_007,Cross encoder reranking,"A cross encoder scores a query and document together, making it slower but often more accurate than bi-encoder retrieval.",retrieval/guide,2026-03-07,retrieval,Sam
+c2_008,Retrieval quality metrics,"Recall@k checks coverage, precision@k checks returned quality, MRR rewards the first hit, and NDCG uses graded relevance and rank.",evaluation/metrics,2026-03-08,evaluation,Priya
+c2_009,BM25 sparse search,BM25 and TF-IDF are sparse methods that rely on exact token overlap and work well for keyword-heavy queries.,retrieval/guide,2026-03-09,retrieval,Noa
+c2_010,Dense embeddings,Dense vector embeddings capture semantic similarity and can match paraphrases even when exact keywords differ.,retrieval/guide,2026-03-10,retrieval,Noa
+c2_011,Query rewriting,"Query expansion helps recall, while segmentation and scoping improve precision when the wording is ambiguous.",retrieval/guide,2026-03-11,retrieval,Mina
+c2_012,Python observability,Python logging records structured events and is commonly filtered by source and author in observability systems.,python/ops,2026-03-12,python,Alice
