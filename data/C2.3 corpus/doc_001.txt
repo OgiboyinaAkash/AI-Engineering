@@ -1,0 +1,1 @@
+AI agents are systems that combine reasoning and tool use. They follow the ReAct pattern: alternate thought and action while using tools such as search and email APIs.

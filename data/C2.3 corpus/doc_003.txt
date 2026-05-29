@@ -1,0 +1,1 @@
+Error recovery should classify failures, retry intelligently, and re-plan when output is malformed. Agents must log decisions and enforce permission boundaries.

@@ -1,0 +1,1 @@
+Simulated failure mode: ambiguous information. This entry shows content that could be interpreted in more than one way, requiring clarification questions from the agent.

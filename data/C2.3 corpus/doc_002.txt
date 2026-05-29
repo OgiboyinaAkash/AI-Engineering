@@ -1,0 +1,1 @@
+Tool schemas define inputs and outputs. JSON-like tool schemas let LLMs validate arguments before calling external services, reducing malformed calls.
