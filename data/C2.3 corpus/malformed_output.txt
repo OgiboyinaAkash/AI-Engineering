@@ -1,1 +1,0 @@
-Simulated failure mode: malformed output. This entry demonstrates the case when a tool returns unexpected data shapes (strings, HTML, or partial JSON).

@@ -1,3 +1,0 @@
-{"query": "concurrent API requests", "relevance": {"c2_001": 2, "c2_002": 1}, "metadata_filter": {"category": "python", "author": "Alice"}}
-{"query": "structured events and author filters", "relevance": {"c2_012": 2, "c2_005": 1}, "metadata_filter": {"category": "python", "author": "Alice"}}
-{"query": "vector database on disk", "relevance": {"c2_003": 2, "c2_004": 1}, "metadata_filter": {"category": "vector_db"}}

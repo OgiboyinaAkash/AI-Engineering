@@ -1,1 +1,0 @@
-Simulated failure mode: timeout. This entry documents how an agent should handle temporary API timeouts and perform exponential backoff.

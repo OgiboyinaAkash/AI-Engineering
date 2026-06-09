@@ -1,6 +1,0 @@
-{"query": "What stores embeddings locally on disk?", "relevance": {"c2_003": 2, "c2_004": 1}, "metadata_filter": {"category": "vector_db"}}
-{"query": "Which method combines keyword and vector retrieval?", "relevance": {"c2_006": 2, "c2_009": 1, "c2_010": 1}, "metadata_filter": {"category": "retrieval"}}
-{"query": "What scores a query and document together?", "relevance": {"c2_007": 2}, "metadata_filter": {"category": "retrieval"}}
-{"query": "Which metric rewards the first relevant hit?", "relevance": {"c2_008": 2}, "metadata_filter": {"category": "evaluation"}}
-{"query": "How do you improve concurrent API requests in Python?", "relevance": {"c2_001": 2, "c2_002": 1}, "metadata_filter": {"category": "python"}}
-{"query": "How should I filter documents by source, date, category, and author?", "relevance": {"c2_005": 2, "c2_012": 1}, "metadata_filter": {"category": "retrieval"}}

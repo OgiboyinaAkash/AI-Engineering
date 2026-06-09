@@ -1,2 +1,0 @@
-Title: Dropout regularization
-Dropout reduces overfitting by randomly dropping units during training.

@@ -1,1 +1,0 @@
-Simulated failure mode: rate limit. This entry explains how to detect rate limits and switch to a fallback or backoff strategy.
