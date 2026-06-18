@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>C1.5: RAG & Knowledge Grounding</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: monospace;
+      padding: 12px;
+      margin: 0;
+      display: flex;
+      gap: 24px;
+    }
+
+    .toc {
+      width: 220px;
+      flex-shrink: 0;
+      border-right: 1px solid #ccc;
+      padding-right: 12px;
+    }
+
+    .toc h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    .toc ul {
+      list-style-type: none;
+      padding-left: 0;
+      margin-top: 0;
+      margin-bottom: 20px;
+    }
+
+    .toc li {
+      margin-bottom: 8px;
+    }
+
+    .main-content {
+      flex-grow: 1;
+      max-width: 80vw;
+    }
+
+    code {
+      display: block;
+      background: #222;
+      color: #eee;
+      width: 80%;
+      padding: 8px;
+      overflow-x: auto;
+    }
+
+    pre {
+      background: #222;
+      color: #eee;
+      width: 80%;
+      padding: 8px;
+      margin: 0;
+      overflow-x: auto;
+    }
+
+    pre code {
+      display: inline;
+      background: none;
+      color: inherit;
+      padding: 0;
+      width: auto;
+    }
+
+    img {
+      max-width: 80vw;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid #ccc;
+      margin: 24px 0;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 80%;
+      margin: 12px 0;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #eee;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Left Sidebar Table of Contents -->
+  <div class="toc">
+    <h3>Modules</h3>
+    <ul>
+      <li><a href="C1.1.html">C1.1: Fundamentals &amp; APIs</a></li>
+      <li><a href="C1.2.html">C1.2: Prompt Engineering</a></li>
+      <li><a href="C1.3.html">C1.3: Building with APIs</a></li>
+      <li><a href="C1.4.html">C1.4: Tool Use &amp; Function Calling</a></li>
+      <li><a href="C1.5.html"><b>C1.5: RAG &amp; Knowledge Grounding</b></a></li>
+    </ul>
+
+    <h3>On This Page</h3>
+    <ul>
+      <li><a href="#the-problem">1. Why LLMs Make Things Up</a></li>
+      <li><a href="#how-rag-works">2. How RAG Works</a></li>
+      <li><a href="#embeddings">3. Embeddings</a></li>
+      <li><a href="#vector-db">4. Vector Databases</a></li>
+      <li><a href="#rag-pipeline">5. The RAG Pipeline</a></li>
+      <li><a href="#chunking">6. Chunking Strategies</a></li>
+      <li><a href="#lab">7. Lab: RAG Q&amp;A Bot</a></li>
+    </ul>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="main-content">
+    <h1>RAG &amp; Knowledge Grounding</h1>
+
+    <section id="the-problem">
+      <h2>The Problem — Why LLMs Make Things Up</h2>
+      <p>
+        Picture this: your company just shipped a customer support chatbot powered by an LLM. It's live, handling thousands of queries a day. One morning, a customer types: <i>"What's your refund policy for orders placed after March 2026?"</i>
+      </p>
+
+      <p>
+        The chatbot confidently replies: <i>"Orders placed after March 2026 are eligible for a full refund within 45 days, with a 10% restocking fee for opened items."</i>
+      </p>
+
+      <p>
+        Sounds professional, right? One problem: <b>your company never had that policy</b>. The 45 days, the 10% fee — all made up. The LLM generated text that <i>sounded</i> like a real policy because it's seen thousands of similar policies during training. Now the customer demands their money back based on what the bot told them.
+      </p>
+
+      <p>
+        This is the <b>hallucination problem</b> in production. And it's not a bug — it's a fundamental property of how LLMs work. Remember from C1.1: LLMs are next-token predictors. They generate text that <i>sounds</i> right, not text that <i>is</i> right. They've never seen your company's actual policies.
+      </p>
+
+      <p>
+        <i>So does that mean we can never trust LLMs with company-specific information?</i>
+      </p>
+
+      <p>
+        No! We absolutely can. We just need to give them the right information <i>at query time</i>. Instead of relying on what the LLM memorized during training, we <b>retrieve the actual documents</b> and hand them to the LLM along with the question.
+      </p>
+
+      <p>
+        This is the core idea behind <b>Retrieval-Augmented Generation</b>, or <b>RAG</b>.
+      </p>
+
+      <p>
+        Think of it like this: a <b>closed-book exam</b> vs an <b>open-book exam</b>.
+      </p>
+      <ul>
+        <li><b>Closed-book (vanilla LLM):</b> You rely purely on memory. And memory can be wrong, incomplete, or outdated. You might confidently write an answer that sounds plausible but is factually wrong.</li>
+        <li><b>Open-book (RAG):</b> You look up the answer in your textbook first, <i>then</i> write your response based on what you actually found. Much, much more accurate.</li>
+      </ul>
+
+      <p>
+        RAG turns every LLM query into an open-book exam.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="how-rag-works">
+      <h2>How RAG Works — The Big Picture</h2>
+      <p>
+        The RAG pipeline has two phases: a one-time <b>preparation phase</b> (where you prepare your knowledge base) and a <b>query phase</b> (where you answer questions). Here's the complete flow:
+      </p>
+
+      <h3>Preparation Phase (done once)</h3>
+      <ol>
+        <li>
+          <b>Chunk:</b> Take your knowledge base — company docs, PDFs, wikis, product manuals, HR policies, whatever — and split it into smaller pieces called <b>chunks</b>. Each chunk is typically a paragraph or a few sentences. Small enough to be focused, large enough to retain meaning.
+        </li>
+        <li>
+          <b>Embed:</b> Convert each chunk into a numerical representation called an <b>embedding</b> — a list of numbers (a vector) that captures the <i>meaning</i> of the text. Two chunks about similar topics will have similar vectors. This is done using an <b>embedding model</b> (like OpenAI's <code>text-embedding-3-small</code>).
+        </li>
+        <li>
+          <b>Store:</b> Save these vectors in a <b>vector database</b> (like ChromaDB, Pinecone, or FAISS). Think of it as a searchable library indexed by meaning, not by keywords.
+        </li>
+      </ol>
+
+      <h3>Query Phase (every user question)</h3>
+      <ol start="4">
+        <li>
+          <b>Embed the question:</b> When a user asks something, convert their question into an embedding using the same model.
+        </li>
+        <li>
+          <b>Retrieve:</b> Search the vector database for chunks whose embeddings are most <i>similar</i> to the question's embedding. These are the most relevant pieces of your knowledge base.
+        </li>
+        <li>
+          <b>Generate:</b> Pass the retrieved chunks as context in the prompt to the LLM, along with the user's question. The LLM answers <i>based on the provided context</i>, not from memory.
+        </li>
+      </ol>
+
+      <p>
+        <i>Wait, so we're literally copy-pasting relevant documents into the prompt?</i>
+      </p>
+
+      <p>
+        Yes, essentially! That's the beauty of it. We're using the LLM's reasoning ability to synthesize an answer, but <b>grounding</b> it in actual source material. The LLM doesn't have to remember anything — we hand it the answer sheet.
+      </p>
+
+      <p>Here's the flow in one line:</p>
+      <p>
+        User asks question → Question gets embedded → Vector DB returns top matching chunks → Chunks + question go into the LLM prompt → LLM answers based on chunks
+      </p>
+
+      <p>
+        If you remember the tool calling pattern from C1.4 — where we gave the LLM hands to act in the world — RAG gives the LLM <b>eyes to read your documents</b>.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="embeddings">
+      <h2>Embeddings — The Secret Sauce</h2>
+      <p>
+        Let's talk about the magic behind RAG: embeddings.
+      </p>
+
+      <p>
+        An <b>embedding</b> converts a piece of text into a point in a high-dimensional space. Texts with similar meanings end up <i>near</i> each other in this space. Texts about completely different topics end up <i>far apart</i>.
+      </p>
+
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>"The cat sat on the mat" and "A kitten was resting on the rug" → <b>Very close</b> in embedding space (similar meaning), even though they share almost no words.</li>
+        <li>"The cat sat on the mat" and "The stock market crashed today" → <b>Very far</b> in embedding space (completely different topics).</li>
+      </ul>
+
+      <p>
+        <i>But how does it know that "cat" and "kitten" are similar if they're different words?</i>
+      </p>
+
+      <p>
+        The embedding model was trained on massive text corpora where "cat" and "kitten" appear in nearly identical contexts. It learned that they're semantically interchangeable, just like you did when you learned the language. This is why embedding search is called <b>semantic search</b> — it searches by meaning, not by exact keyword matches.
+      </p>
+
+      <p>Here's how to create an embedding in code:</p>
+
+      <pre><code>from openai import OpenAI
+client = OpenAI()
+
+response = client.embeddings.create(
+    model="text-embedding-3-small",
+    input="What is the refund policy for premium members?"
+)
+
+embedding_vector = response.data[0].embedding
+print(f"Embedding dimensions: {len(embedding_vector)}")
+print(f"First 5 values: {embedding_vector[:5]}")</code></pre>
+
+      <p>Output:</p>
+      <pre><code>Embedding dimensions: 1536
+First 5 values: [0.0023, -0.0121, 0.0456, -0.0089, 0.0234]</code></pre>
+
+      <p>
+        Each embedding is a list of 1,536 numbers. Don't worry about what each number means — just know that similar texts produce similar lists of numbers. That's all your code needs to know to find relevant documents.
+      </p>
+
+      <p>
+        <b>Cost note:</b> Embedding models are <i>extremely</i> cheap compared to generation models. With <code>text-embedding-3-small</code>, you can embed around 60,000 pages of text for about $1. So don't worry about embedding costs.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="vector-db">
+      <h2>Vector Databases &amp; Similarity Search</h2>
+      <p>
+        Once you have embeddings, you need somewhere to store them and search through them efficiently. That's what a <b>vector database</b> is — a database optimized for storing vectors and finding the most similar ones to a query vector.
+      </p>
+
+      <p>
+        Here's a good analogy: Imagine a library where books aren't organized by author or title, but by <i>what they're about</i>. Books about cooking Italian pasta are near books about making pizza dough. Books about machine learning are near books about statistics. When you walk in and say <i>"I need something about making homemade pasta"</i>, the librarian instantly points you to the right shelf — not because they searched every page, but because they know where the "Italian cooking" region is in the library's meaning-space.
+      </p>
+
+      <p>
+        That's exactly how a vector database works. The "shelves" are regions in embedding space, and "pointing you to the right one" is a similarity search.
+      </p>
+
+      <p>
+        Let's use <b>ChromaDB</b> — a simple, local vector database that's perfect for learning. It even generates embeddings for you automatically:
+      </p>
+
+      <pre><code>import chromadb
+
+client = chromadb.Client()
+collection = client.create_collection(name="company_docs")
+
+# Add documents — ChromaDB will auto-generate embeddings
+collection.add(
+    documents=[
+        "Premium members get a 60-day refund window on all purchases.",
+        "Standard members get a 30-day refund window.",
+        "All refunds require the original receipt or order confirmation email.",
+        "Our server uptime SLA guarantees 99.9% availability.",
+        "Contact support@cloudnest.com for billing and payment issues."
+    ],
+    ids=["doc1", "doc2", "doc3", "doc4", "doc5"]
+)
+
+# Search for relevant documents
+results = collection.query(
+    query_texts=["What is the refund policy for premium users?"],
+    n_results=3
+)
+
+print("Top 3 relevant documents:")
+for i, doc in enumerate(results["documents"][0]):
+    print(f"  {i+1}. {doc}")</code></pre>
+
+      <p>Expected output:</p>
+      <pre><code>Top 3 relevant documents:
+  1. Premium members get a 60-day refund window on all purchases.
+  2. Standard members get a 30-day refund window.
+  3. All refunds require the original receipt or order confirmation email.</code></pre>
+
+      <p>
+        <i>Notice something?</i> The query said "premium users" but the document said "premium members" — and it still matched perfectly! And the SLA and billing docs were correctly excluded because they're not about refunds. That's semantic search at work.
+      </p>
+
+      <p>Compare this to traditional keyword search:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Keyword Search (Ctrl+F)</th>
+            <th>Semantic Search (Embeddings)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>"refund policy" matches "return guidelines"</td>
+            <td>No</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>Speed</td>
+            <td>Very fast</td>
+            <td>Fast (with index)</td>
+          </tr>
+          <tr>
+            <td>Understands meaning</td>
+            <td>No</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>Requires embedding model</td>
+            <td>No</td>
+            <td>Yes</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr>
+
+    <section id="rag-pipeline">
+      <h2>Putting It All Together — The RAG Pipeline</h2>
+      <p>
+        Now let's wire everything together into a complete, working RAG system. We'll load documents into ChromaDB, retrieve relevant chunks for a user's question, and use them to ground the LLM's response.
+      </p>
+
+      <p>
+        The most important piece is the prompt template. Pay very close attention to this:
+      </p>
+
+      <pre><code>def build_rag_prompt(context_chunks, user_question):
+    context = "\n---\n".join(context_chunks)
+    return f"""Answer the user's question based ONLY on the following context.
+If the context doesn't contain enough information to answer, say "I don't have information about that in the available documents."
+Do not make up or infer information that isn't explicitly stated in the context.
+
+Context:
+{context}
+
+Question: {user_question}
+Answer:"""</code></pre>
+
+      <p>
+        <i>That instruction — "based ONLY on the following context" — is the single most important line in any RAG system.</i> Without it, the LLM will happily mix retrieved facts with hallucinated ones. It'll take one real fact from your documents and then "helpfully" add three made-up details. With this instruction, the LLM stays grounded.
+      </p>
+
+      <p>
+        Here's the complete end-to-end code:
+      </p>
+
+      <pre><code>import os
+import chromadb
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
+llm_client = OpenAI()
+
+# --- Step 1: Load documents into vector database ---
+chroma_client = chromadb.Client()
+collection = chroma_client.create_collection(name="cloudnest_policies")
+
+policy_docs = [
+    "Premium plan customers are eligible for a full refund within 60 days of purchase.",
+    "Standard plan customers can request a refund within 30 days of purchase.",
+    "Enterprise customers get a 90-day refund window with prorated refunds available up to 6 months.",
+    "All refund requests must include the original order ID and registered email address.",
+    "CloudNest guarantees 99.9% server uptime under our Service Level Agreement.",
+    "Scheduled maintenance windows are announced 48 hours in advance via email.",
+    "Technical support is available 24/7 for Premium and Enterprise plans.",
+    "Standard plan customers receive support during business hours: 9 AM to 6 PM IST.",
+    "Data backups are performed daily and retained for 30 days on all plans.",
+    "CloudNest does not share customer data with third parties under any circumstances."
+]
+
+collection.add(
+    documents=policy_docs,
+    ids=[f"doc{i}" for i in range(len(policy_docs))]
+)
+print(f"Loaded {len(policy_docs)} documents into vector database.\n")
+
+# --- Step 2: Retrieval function ---
+def retrieve(question, n_results=3):
+    results = collection.query(
+        query_texts=[question],
+        n_results=n_results
+    )
+    return results["documents"][0], results["ids"][0]
+
+# --- Step 3: RAG prompt builder ---
+def build_rag_prompt(context_chunks, user_question):
+    context = "\n---\n".join(context_chunks)
+    return f"""Answer the user's question based ONLY on the following context.
+If the context doesn't contain enough information to answer, say "I don't have information about that in the available documents."
+Do not make up or infer information that isn't explicitly stated in the context.
+
+Context:
+{context}
+
+Question: {user_question}
+Answer:"""
+
+# --- Step 4: Complete RAG query ---
+def ask(question):
+    # Retrieve relevant chunks
+    chunks, chunk_ids = retrieve(question)
+    print(f"Retrieved {len(chunks)} relevant chunks...")
+
+    # Build grounded prompt
+    prompt = build_rag_prompt(chunks, question)
+
+    # Query LLM with context
+    response = llm_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant for CloudNest Hosting. Answer questions accurately based on provided context."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.0
+    )
+
+    answer = response.choices[0].message.content
+    print(f"A: {answer}")
+    print(f"[Source chunks: {', '.join(chunk_ids)}]\n")
+    return answer
+
+# --- Step 5: Test it! ---
+if __name__ == "__main__":
+    print("--- RAG Q&A Bot ---\n")
+
+    test_questions = [
+        "What is the refund policy for enterprise customers?",
+        "When is technical support available for standard plan users?",
+        "How long are data backups retained?",
+        "Does CloudNest offer GPU instances?",
+        "What programming languages does CloudNest support?",
+    ]
+
+    answerable = 0
+    declined = 0
+
+    for q in test_questions:
+        print(f"Q: {q}")
+        answer = ask(q)
+        if "don't have information" in answer.lower():
+            declined += 1
+        else:
+            answerable += 1
+
+    print(f"--- Results ---")
+    print(f"Questions answered from docs: {answerable}")
+    print(f"Correctly declined: {declined}")</code></pre>
+
+      <p>Expected output:</p>
+
+      <pre><code>--- RAG Q&A Bot ---
+
+Loaded 10 documents into vector database.
+
+Q: What is the refund policy for enterprise customers?
+Retrieved 3 relevant chunks...
+A: Enterprise customers get a 90-day refund window with prorated refunds available up to 6 months. All refund requests must include the original order ID and registered email address.
+[Source chunks: doc2, doc3, doc0]
+
+Q: When is technical support available for standard plan users?
+Retrieved 3 relevant chunks...
+A: Standard plan customers receive support during business hours: 9 AM to 6 PM IST.
+[Source chunks: doc7, doc6, doc1]
+
+Q: How long are data backups retained?
+Retrieved 3 relevant chunks...
+A: Data backups are performed daily and retained for 30 days on all plans.
+[Source chunks: doc8, doc4, doc5]
+
+Q: Does CloudNest offer GPU instances?
+Retrieved 3 relevant chunks...
+A: I don't have information about that in the available documents.
+[Source chunks: doc4, doc6, doc8]
+
+Q: What programming languages does CloudNest support?
+Retrieved 3 relevant chunks...
+A: I don't have information about that in the available documents.
+[Source chunks: doc6, doc7, doc4]
+
+--- Results ---
+Questions answered from docs: 3
+Correctly declined: 2</code></pre>
+
+      <p>
+        <i>Look at that!</i> The bot correctly answered 3 questions using real policy data, and correctly said "I don't know" for 2 questions that aren't covered in the documents. No hallucinations. No made-up policies. That's the power of RAG.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="chunking">
+      <h2>Chunking Strategies</h2>
+      <p>
+        We mentioned earlier that you split your documents into "chunks" before embedding them. This step sounds simple, but <i>how</i> you chunk your documents matters enormously for answer quality.
+      </p>
+
+      <p>
+        Think about it: if your chunk is just the fragment "60 days", that tells you nothing useful. 60 days of what? For whom? But if the chunk is "Premium plan customers are eligible for a full refund within 60 days of purchase", now the LLM has everything it needs.
+      </p>
+
+      <p>On the flip side, if your chunk is 3 pages long, you're wasting precious context window space and diluting the relevance — the LLM has to find the needle in a mini-haystack within the chunk itself.</p>
+
+      <p>Here are the common strategies:</p>
+
+      <ol>
+        <li>
+          <b>Fixed-size chunking:</b> Split every N characters or N tokens. Simple to implement, works reasonably well. The risk is cutting a sentence in half mid-thought.
+          <br><br>
+          <pre><code># Simple fixed-size chunking
+def chunk_text(text, chunk_size=500, overlap=50):
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunks.append(text[start:end])
+        start = end - overlap  # Overlap with previous chunk
+    return chunks</code></pre>
+        </li>
+        <li>
+          <b>Sentence-based chunking:</b> Split on sentence boundaries. Preserves complete thoughts, which leads to better embeddings and better retrieval. Slightly more complex to implement.
+        </li>
+        <li>
+          <b>Overlap chunking:</b> Each chunk overlaps with the previous one by some number of tokens (say 50). This ensures that information sitting at the boundary between two chunks isn't lost. If a key fact spans the boundary, both chunks will contain it.
+        </li>
+      </ol>
+
+      <p><b>Rule of thumb:</b> Start with chunks of 200-500 tokens with a 50-token overlap. Adjust based on your results. If the LLM's answers seem to lack context, increase chunk size. If retrieval seems imprecise, decrease it.</p>
+
+      <p>
+        You'll hear about libraries like <b>LangChain</b> and <b>LlamaIndex</b> that handle chunking, embedding, and retrieval for you. They're great tools and we'll use them later, but it's important to understand what they're doing under the hood first — which is exactly what we've covered in this chapter.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="lab">
+      <h2>Lab: Build a RAG-Powered Q&amp;A Bot</h2>
+
+      <h3>1. Problem Setup</h3>
+      <p>
+        You are building an internal Q&amp;A assistant for CloudNest Hosting (continuing from C1.3's scenario). The company has a set of policy documents about refunds, SLAs, support hours, data handling, and pricing. Employees need to quickly find accurate answers without reading through everything.
+      </p>
+      <p>
+        The critical requirement: the bot must answer <b>ONLY</b> based on the provided documents and clearly say "I don't know" when the information isn't available. No hallucinations allowed.
+      </p>
+
+      <h3>2. Environment Setup</h3>
+      <pre><code>pip install openai chromadb python-dotenv</code></pre>
+
+      <h3>3. Step-by-Step Instructions</h3>
+      <ol>
+        <li>Define a list of 10 company policy statements as mock data (or use the ones from the section above).</li>
+        <li>Initialize ChromaDB and load the policy documents.</li>
+        <li>Write the retrieval function that takes a question and returns the top 3 relevant chunks.</li>
+        <li>Build the RAG prompt template with the grounding instruction.</li>
+        <li>Wire everything together: question → retrieve → build prompt → LLM → answer.</li>
+        <li>Test with questions that ARE in the docs and questions that AREN'T.</li>
+      </ol>
+
+      <h3>4. Starter Code</h3>
+      <pre><code>import os
+import chromadb
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
+llm_client = OpenAI()
+
+# --- Company Policy Data ---
+policies = [
+    "CloudNest Starter plan costs ₹499/month and includes 1 vCPU, 1 GB RAM, and 20 GB SSD storage.",
+    "CloudNest Pro plan costs ₹1,499/month and includes 2 vCPUs, 4 GB RAM, and 80 GB SSD storage.",
+    "CloudNest Enterprise plan costs ₹4,999/month with dedicated resources and a personal account manager.",
+    "All plans include free SSL certificates and DDoS protection.",
+    "Premium plan customers are eligible for a full refund within 60 days of purchase.",
+    "Standard plan customers can request a refund within 30 days of purchase.",
+    "Enterprise customers get a 90-day refund window with prorated refunds up to 6 months.",
+    "Technical support is available 24/7 for Pro and Enterprise plans via chat and email.",
+    "Starter plan support is available during business hours: 9 AM to 6 PM IST, weekdays only.",
+    "Data backups are automatic, performed daily, and retained for 30 days across all plans.",
+    "CloudNest data centers are located in Mumbai, Bangalore, and Singapore.",
+    "Customers can request data deletion at any time by contacting privacy@cloudnest.com."
+]
+
+# --- Initialize Vector Database ---
+chroma = chromadb.Client()
+collection = chroma.create_collection(name="cloudnest_kb")
+collection.add(
+    documents=policies,
+    ids=[f"policy_{i}" for i in range(len(policies))]
+)
+print(f"Loaded {len(policies)} policy documents.\n")
+
+# --- Retrieval ---
+def retrieve_context(question, top_k=3):
+    results = collection.query(query_texts=[question], n_results=top_k)
+    return results["documents"][0], results["ids"][0]
+
+# --- RAG Prompt ---
+def build_prompt(context_docs, question):
+    context = "\n---\n".join(context_docs)
+    return f"""Answer the question based ONLY on the context below.
+If the answer is not in the context, respond with: "I don't have information about that."
+
+Context:
+{context}
+
+Question: {question}
+Answer:"""
+
+# --- Ask Function ---
+def ask(question):
+    docs, ids = retrieve_context(question)
+    prompt = build_prompt(docs, question)
+
+    response = llm_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are CloudNest's internal knowledge assistant. Be concise and accurate."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.0
+    )
+
+    answer = response.choices[0].message.content
+    return answer, ids
+
+# --- Test Harness ---
+if __name__ == "__main__":
+    test_cases = [
+        {"q": "How much does the Pro plan cost?", "has_answer": True},
+        {"q": "What is the refund window for enterprise customers?", "has_answer": True},
+        {"q": "Where are CloudNest data centers located?", "has_answer": True},
+        {"q": "Does CloudNest support Kubernetes deployments?", "has_answer": False},
+        {"q": "Can I get a custom domain with my hosting plan?", "has_answer": False},
+    ]
+
+    correct = 0
+
+    for case in test_cases:
+        print(f"Q: {case['q']}")
+        answer, source_ids = ask(case['q'])
+        print(f"A: {answer}")
+        print(f"[Sources: {', '.join(source_ids)}]\n")
+
+        is_decline = "don't have information" in answer.lower()
+        if case["has_answer"] and not is_decline:
+            correct += 1
+        elif not case["has_answer"] and is_decline:
+            correct += 1
+
+    print(f"--- Accuracy: {correct}/{len(test_cases)} ---")</code></pre>
+
+      <h3>5. Expected Output Sample</h3>
+      <pre><code>Loaded 12 policy documents.
+
+Q: How much does the Pro plan cost?
+A: The CloudNest Pro plan costs ₹1,499/month and includes 2 vCPUs, 4 GB RAM, and 80 GB SSD storage.
+[Sources: policy_1, policy_0, policy_3]
+
+Q: What is the refund window for enterprise customers?
+A: Enterprise customers get a 90-day refund window with prorated refunds available up to 6 months.
+[Sources: policy_6, policy_5, policy_4]
+
+Q: Where are CloudNest data centers located?
+A: CloudNest data centers are located in Mumbai, Bangalore, and Singapore.
+[Sources: policy_10, policy_11, policy_3]
+
+Q: Does CloudNest support Kubernetes deployments?
+A: I don't have information about that.
+[Sources: policy_2, policy_1, policy_7]
+
+Q: Can I get a custom domain with my hosting plan?
+A: I don't have information about that.
+[Sources: policy_3, policy_0, policy_1]
+
+--- Accuracy: 5/5 ---</code></pre>
+
+      <h3>6. Failure Scenario</h3>
+      <p>
+        Remove the grounding instruction from the prompt. Replace the <code>build_prompt</code> function's instructions with just: <code>"Answer this question: {question}"</code> (without context or the ONLY instruction). Now ask: <i>"Does CloudNest support Kubernetes deployments?"</i>
+      </p>
+      <p>
+        Watch how the LLM now hallucates a plausible-sounding answer: <i>"Yes, CloudNest offers managed Kubernetes clusters starting at..."</i> — completely fabricated. This demonstrates exactly why the grounding instruction is non-negotiable in production RAG systems.
+      </p>
+
+      <h3>7. Extension Challenge (Optional)</h3>
+      <p>
+        Instead of hardcoded policy strings, load a real <code>.txt</code> file (write a small company handbook). Implement chunking with overlap using the <code>chunk_text</code> function from the Chunking Strategies section. Compare the answer quality between using the entire file as one chunk vs splitting it into overlapping chunks of 300 characters.
+      </p>
+
+      <h3>8. Reflection Prompts</h3>
+      <ol>
+        <li>Why is it critical to instruct the LLM to answer "ONLY based on the provided context"? What happens architecturally when you remove that constraint?</li>
+        <li>What are the tradeoffs of using smaller vs larger chunk sizes? How does this connect to the context window limitations and needle-in-a-haystack problem from C1.1?</li>
+      </ol>
+    </section>
+  </div>
+
+</body>
+</html>
