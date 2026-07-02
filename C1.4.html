@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>C1.4: Tool Use & Function Calling</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: monospace;
+      padding: 12px;
+      margin: 0;
+      display: flex;
+      gap: 24px;
+    }
+
+    .toc {
+      width: 220px;
+      flex-shrink: 0;
+      border-right: 1px solid #ccc;
+      padding-right: 12px;
+    }
+
+    .toc h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    .toc ul {
+      list-style-type: none;
+      padding-left: 0;
+      margin-top: 0;
+      margin-bottom: 20px;
+    }
+
+    .toc li {
+      margin-bottom: 8px;
+    }
+
+    .main-content {
+      flex-grow: 1;
+      max-width: 80vw;
+    }
+
+    code {
+      display: block;
+      background: #222;
+      color: #eee;
+      width: 80%;
+      padding: 8px;
+      overflow-x: auto;
+    }
+
+    pre {
+      background: #222;
+      color: #eee;
+      width: 80%;
+      padding: 8px;
+      margin: 0;
+      overflow-x: auto;
+    }
+
+    pre code {
+      display: inline;
+      background: none;
+      color: inherit;
+      padding: 0;
+      width: auto;
+    }
+
+    img {
+      max-width: 80vw;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid #ccc;
+      margin: 24px 0;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 80%;
+      margin: 12px 0;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #eee;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Left Sidebar Table of Contents -->
+  <div class="toc">
+    <h3>Modules</h3>
+    <ul>
+      <li><a href="C1.1.html">C1.1: Fundamentals &amp; APIs</a></li>
+      <li><a href="C1.2.html">C1.2: Prompt Engineering</a></li>
+      <li><a href="C1.3.html">C1.3: Building with APIs</a></li>
+      <li><a href="C1.4.html"><b>C1.4: Tool Use &amp; Function Calling</b></a></li>
+      <li><a href="C1.5.html">C1.5: RAG &amp; Knowledge Grounding</a></li>
+    </ul>
+
+    <h3>On This Page</h3>
+    <ul>
+      <li><a href="#why-tools">1. Why LLMs Need Tools</a></li>
+      <li><a href="#how-it-works">2. How Function Calling Works</a></li>
+      <li><a href="#defining-tools">3. Defining Tools</a></li>
+      <li><a href="#complete-loop">4. The Complete Loop</a></li>
+      <li><a href="#parallel-tools">5. Parallel &amp; Multiple Tool Calls</a></li>
+      <li><a href="#lab">6. Lab: Tool-Using Assistant</a></li>
+    </ul>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="main-content">
+    <h1>Tool Use &amp; Function Calling</h1>
+    
+    <section id="why-tools">
+      <h2>Why LLMs Need Tools</h2>
+      <p>
+        Try this right now: open ChatGPT and ask it <i>"What's the weather in Bangalore right now?"</i>
+      </p>
+
+      <p>
+        If you're using an older model or a local LLM, it'll either make something up ("It's about 28°C and sunny!" — sounds great, but it has no idea) or honestly say it doesn't have access to real-time data. Either way, it <b>can't actually check the weather</b>.
+      </p>
+
+      <p>
+        Same story with: <i>"What's the price of Bitcoin right now?"</i>, <i>"Book me a flight to Mumbai for tomorrow"</i>, or <i>"Send Vikram an email saying I'll be late."</i>
+      </p>
+
+      <p>
+        Here's the key insight: LLMs can <i>reason</i> about what to do, but they can't <i>do</i> things. They can't browse the internet, they can't query your company's database, they can't call your internal APIs. Their knowledge is frozen at training time and they have no hands to act in the world.
+      </p>
+
+      <p>
+        Think of it this way: an LLM is like a <b>brilliant strategist locked in a room with no phone</b>. You slide a note under the door saying "I need to know the weather in Bangalore." The strategist thinks carefully and writes back: "You should call the weather API for Bangalore and check the current temperature." Brilliant advice! But <i>someone else</i> has to actually make the call.
+      </p>
+
+      <p>
+        That "someone else" is your code.
+      </p>
+
+      <p>
+        This is the idea behind <b>Function Calling</b> (also called <b>Tool Use</b>): instead of the LLM generating a text answer, it outputs a structured request — "I want to call this function with these arguments" — and your code executes that function, gets the result, and feeds it back to the LLM. The LLM then uses the real result to compose a proper answer for the user.
+      </p>
+
+      <p>
+        <i>What? That's it? The LLM just... asks us to run a function?</i> Yes! And it's surprisingly powerful.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="how-it-works">
+      <h2>How Function Calling Works</h2>
+      <p>
+        Let's walk through the entire flow step by step. Say you're building a pizza ordering chatbot and the user says: <i>"Order me a large pepperoni pizza."</i>
+      </p>
+
+      <p>Here's exactly what happens:</p>
+
+      <ol>
+        <li>
+          <b>You define available tools:</b> Before making the API call, you tell the LLM: "Hey, you have access to a function called <code>place_order</code>. It takes a size and a topping as arguments." You describe this using a JSON Schema.
+        </li>
+        <li>
+          <b>You send the user's query + tool definitions</b> to the LLM.
+        </li>
+        <li>
+          <b>The LLM decides:</b> "Should I just answer this with text, or do I need to call a tool?" In this case, ordering a pizza clearly needs an action, so it decides to call a tool.
+        </li>
+        <li>
+          <b>The LLM returns a structured JSON object</b> — NOT a text response. Something like: <code>{"name": "place_order", "arguments": {"size": "large", "topping": "pepperoni"}}</code>
+        </li>
+        <li>
+          <b>Your code parses this</b>, sees "ah, it wants to call <code>place_order</code>", and actually executes the function. Maybe it hits your restaurant's API, places the order, and gets back: <code>{"order_id": 4521, "status": "confirmed"}</code>.
+        </li>
+        <li>
+          <b>You send the function result back</b> to the LLM in a follow-up API call.
+        </li>
+        <li>
+          <b>The LLM composes a natural language response</b> using the real result: "Done! Your large pepperoni pizza has been ordered. Order #4521. It should arrive in about 30 minutes!"
+        </li>
+      </ol>
+
+      <p>
+        <i>But wait — the LLM didn't actually order the pizza?</i>
+      </p>
+
+      <p>
+        Exactly! The LLM just decided <b>what</b> to do and <b>with what arguments</b>. Your code did the actual ordering. The LLM is the brain; your code is the hands.
+      </p>
+
+      <p>
+        Before reading on, stop and think about this: <i>why is it designed this way? Why not let the LLM directly execute functions?</i>
+      </p>
+
+      <p>
+        The answer is <b>safety</b>. You don't want an LLM autonomously executing database deletes or transferring money without your code validating things first. By keeping execution in your code, you maintain full control.
+      </p>
+
+      <p>
+        Here's a summary of the flow:
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Step</th>
+            <th>Who Does It</th>
+            <th>What Happens</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>Your Code</td>
+            <td>Sends user query + tool definitions to LLM API</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>LLM</td>
+            <td>Analyzes query, decides to call a tool, returns function name + arguments</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>Your Code</td>
+            <td>Executes the actual function, gets the result</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>Your Code</td>
+            <td>Sends function result back to LLM API (second call)</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>LLM</td>
+            <td>Composes natural language answer using the real result</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        <i>Notice that we make <b>TWO API calls</b> here. The first one asks the LLM what to do. The second one feeds the tool result back and asks it to compose the final answer.</i> This is important for understanding costs and latency.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="defining-tools">
+      <h2>Defining Tools for the LLM</h2>
+      <p>
+        Now, how does the LLM know what tools it has access to? You tell it! Every tool is described using a JSON Schema that includes the function's name, what it does, and what parameters it accepts.
+      </p>
+
+      <p>
+        Here's what a tool definition looks like for a <code>get_weather</code> function:
+      </p>
+
+      <pre><code>tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the current weather for a given city. Use this when the user asks about weather, temperature, or climate conditions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {
+                        "type": "string",
+                        "description": "The city name, e.g. 'Bangalore'"
+                    },
+                    "unit": {
+                        "type": "string",
+                        "enum": ["celsius", "fahrenheit"],
+                        "description": "Temperature unit. Defaults to celsius."
+                    }
+                },
+                "required": ["city"]
+            }
+        }
+    }
+]</code></pre>
+
+      <p>
+        And here's the actual Python function that goes with it:
+      </p>
+
+      <pre><code>def get_weather(city, unit="celsius"):
+    # In production, this would call a real weather API
+    # For now, we return mock data
+    weather_data = {
+        "Bangalore": {"temp": 28, "condition": "Partly Cloudy"},
+        "Mumbai": {"temp": 33, "condition": "Humid"},
+        "Delhi": {"temp": 42, "condition": "Sunny"},
+    }
+    data = weather_data.get(city, {"temp": 25, "condition": "Unknown"})
+    return f"{data['temp']}°{'C' if unit == 'celsius' else 'F'}, {data['condition']}"</code></pre>
+
+      <p>
+        A few critical things to notice:
+      </p>
+
+      <ol>
+        <li>
+          <b>The <code>description</code> field is everything.</b> The LLM reads this description to decide <i>when</i> to use the tool. If your description says "Get weather data" but doesn't mention "temperature" or "climate", the LLM might not use it when someone asks "Is it hot in Delhi today?" Be specific and thorough.
+        </li>
+        <li>
+          <b>Parameter descriptions matter too.</b> The LLM uses them to figure out how to extract the right values from the user's natural language query. If Vikram says "What's the weather like in Bengaluru?", the LLM needs to know that "Bengaluru" maps to the <code>city</code> parameter.
+        </li>
+        <li>
+          <b>The <code>required</code> array tells the LLM</b> which parameters must be provided. If <code>city</code> is required but the user just says "What's the weather?", the LLM should ask for clarification instead of calling the function without a city.
+        </li>
+      </ol>
+
+      <p>
+        <i>Think of tool definitions as a restaurant menu for the LLM.</i> If the menu doesn't describe the dishes well, the LLM will order the wrong thing.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="complete-loop">
+      <h2>The Complete Tool Calling Loop</h2>
+      <p>
+        Let's put it all together with a full working example. This is the code pattern you'll use in almost every tool-calling application:
+      </p>
+
+      <pre><code>import os
+import json
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
+client = OpenAI()
+
+# --- Step 1: Define the actual function ---
+def get_weather(city, unit="celsius"):
+    weather_data = {
+        "Bangalore": {"temp": 28, "condition": "Partly Cloudy"},
+        "Mumbai": {"temp": 33, "condition": "Humid"},
+        "Delhi": {"temp": 42, "condition": "Sunny"},
+    }
+    data = weather_data.get(city, {"temp": 25, "condition": "Unknown"})
+    return json.dumps({"city": city, "temperature": data["temp"], "unit": unit, "condition": data["condition"]})
+
+# --- Step 2: Define the tool schema ---
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the current weather for a given city.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "The city name"},
+                    "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+                },
+                "required": ["city"]
+            }
+        }
+    }
+]
+
+# Map function names to actual functions
+available_functions = {"get_weather": get_weather}
+
+# --- Step 3: First API call — ask the LLM what to do ---
+messages = [
+    {"role": "user", "content": "What's the weather in Bangalore right now?"}
+]
+
+response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=messages,
+    tools=tools,
+    temperature=0.0
+)
+
+response_message = response.choices[0].message
+
+# --- Step 4: Check if the LLM wants to call a tool ---
+if response_message.tool_calls:
+    # Append the assistant's response (with tool call info) to message history
+    messages.append(response_message)
+    
+    for tool_call in response_message.tool_calls:
+        function_name = tool_call.function.name
+        function_args = json.loads(tool_call.function.arguments)
+        
+        print(f"[Tool Called: {function_name}({tool_call.function.arguments})]")
+        
+        # Execute the actual function
+        result = available_functions[function_name](**function_args)
+        
+        # Append the tool result to message history
+        messages.append({
+            "role": "tool",
+            "tool_call_id": tool_call.id,
+            "content": result
+        })
+    
+    # --- Step 5: Second API call — get the final answer ---
+    final_response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages,
+        temperature=0.0
+    )
+    
+    print(f"Assistant: {final_response.choices[0].message.content}")
+else:
+    # No tool call needed — LLM answered directly
+    print(f"Assistant: {response_message.content}")</code></pre>
+      <br>
+
+      <p>The output looks like:</p>
+
+      <pre><code>[Tool Called: get_weather({"city": "Bangalore"})]
+Assistant: The current weather in Bangalore is 28°C with partly cloudy skies.</code></pre>
+
+      <p>
+        If you've been following carefully, you'll see the pattern:
+      </p>
+      <ol>
+        <li>We send the query with tools. LLM says "call <code>get_weather</code> with city=Bangalore".</li>
+        <li>We run <code>get_weather("Bangalore")</code> ourselves and get the result.</li>
+        <li>We send the result back. LLM writes a nice answer using the real data.</li>
+      </ol>
+
+      <p>
+        <i>This is the fundamental pattern behind every AI agent, every AI assistant, every tool-using chatbot you've ever seen.</i> ChatGPT browsing the web? Same pattern. Claude running code? Same pattern. It's always: LLM decides → your code executes → LLM responds.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="parallel-tools">
+      <h2>Parallel &amp; Multiple Tool Calls</h2>
+      <p>
+        What happens when Priya asks: <i>"What's the weather in both Bangalore and Mumbai?"</i>
+      </p>
+
+      <p>
+        Modern LLMs are smart enough to realize they need to call <code>get_weather</code> <b>twice</b> — once for each city. And they do it in a single response! The <code>tool_calls</code> field in the API response is a <b>list</b>, not a single object.
+      </p>
+
+      <pre><code># The response might contain:
+# response_message.tool_calls = [
+#     ToolCall(function=Function(name="get_weather", arguments='{"city": "Bangalore"}')),
+#     ToolCall(function=Function(name="get_weather", arguments='{"city": "Mumbai"}'))
+# ]
+
+# Our code from the previous section already handles this!
+# The for loop iterates through ALL tool calls:
+for tool_call in response_message.tool_calls:
+    function_name = tool_call.function.name
+    function_args = json.loads(tool_call.function.arguments)
+    result = available_functions[function_name](**function_args)
+    messages.append({
+        "role": "tool",
+        "tool_call_id": tool_call.id,
+        "content": result
+    })</code></pre>
+
+      <p>
+        Notice that each tool call has a unique <code>tool_call.id</code>. When we send the results back, we include this ID so the LLM knows which result belongs to which call.
+      </p>
+
+      <p>
+        Here's where it gets interesting: the LLM also knows when it <b>doesn't</b> need tools. If Priya asks "What's the capital of France?", the LLM will just answer directly — no tool call, no second API request. It only invokes tools when it genuinely can't answer from its training data.
+      </p>
+
+      <p>
+        Modern models like GPT-4o, Claude 3.5 Sonnet, and Gemini are very good at this decision-making. They'll correctly pick between answering directly, calling one tool, or calling multiple tools in parallel.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="lab">
+      <h2>Lab: Build a Tool-Using Assistant</h2>
+      
+      <h3>1. Problem Setup</h3>
+      <p>
+        You are building a CLI assistant that has access to 3 tools:
+      </p>
+      <ul>
+        <li><code>get_weather(city)</code> — returns mock weather data for Indian cities</li>
+        <li><code>calculate_tip(bill_amount, tip_percent)</code> — calculates the tip and total</li>
+        <li><code>search_contacts(name)</code> — looks up a person in a mock contacts dictionary</li>
+      </ul>
+      <p>
+        The assistant should handle queries like "What's the weather in Delhi?", "How much tip on a 450 rupee bill at 15%?", and "Find Priya's phone number" — all through function calling. It should also handle regular questions (like "What's 2+2?") without invoking any tools.
+      </p>
+
+      <h3>2. Environment Setup</h3>
+      <p>Using the same environment from earlier modules:</p>
+      <pre><code>pip install openai python-dotenv</code></pre>
+
+      <h3>3. Step-by-Step Instructions</h3>
+      <ol>
+        <li>Define the three Python functions with mock data.</li>
+        <li>Write the corresponding tool definition schemas (with clear descriptions!).</li>
+        <li>Implement the tool dispatch loop: detect tool calls → execute the right function → send results back.</li>
+        <li>Handle the case where no tool is needed (the LLM just answers directly).</li>
+        <li>Print which tool was called and with what arguments for transparency.</li>
+        <li>Wrap everything in an interactive loop that reads user input from the terminal.</li>
+      </ol>
+
+      <h3>4. Starter Code</h3>
+      <pre><code>import os
+import json
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
+client = OpenAI()
+
+# --- Mock Functions ---
+def get_weather(city):
+    weather_db = {
+        "Delhi": {"temp": 42, "condition": "Sunny and hot"},
+        "Mumbai": {"temp": 33, "condition": "Humid with light rain"},
+        "Bangalore": {"temp": 28, "condition": "Partly cloudy"},
+        "Chennai": {"temp": 36, "condition": "Hot and humid"},
+        "Kolkata": {"temp": 34, "condition": "Overcast"},
+    }
+    data = weather_db.get(city, {"temp": 25, "condition": "Data not available"})
+    return json.dumps({"city": city, "temperature_c": data["temp"], "condition": data["condition"]})
+
+def calculate_tip(bill_amount, tip_percent):
+    tip = bill_amount * (tip_percent / 100)
+    total = bill_amount + tip
+    return json.dumps({"bill": bill_amount, "tip_percent": tip_percent, "tip_amount": tip, "total": total})
+
+def search_contacts(name):
+    contacts = {
+        "Priya": {"phone": "+91-98765-43210", "email": "priya@example.com"},
+        "Vikram": {"phone": "+91-91234-56789", "email": "vikram@example.com"},
+        "Ravi": {"phone": "+91-87654-32100", "email": "ravi@example.com"},
+    }
+    result = contacts.get(name)
+    if result:
+        return json.dumps({"name": name, "phone": result["phone"], "email": result["email"]})
+    return json.dumps({"error": f"No contact found for '{name}'"})
+
+# --- Tool Definitions ---
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get current weather conditions for an Indian city. Use when the user asks about weather, temperature, or climate.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "City name, e.g. 'Bangalore'"}
+                },
+                "required": ["city"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "calculate_tip",
+            "description": "Calculate the tip amount and total bill. Use when the user asks about tips, gratuity, or bill splitting.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "bill_amount": {"type": "number", "description": "The bill amount in rupees"},
+                    "tip_percent": {"type": "number", "description": "The tip percentage, e.g. 15 for 15%"}
+                },
+                "required": ["bill_amount", "tip_percent"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_contacts",
+            "description": "Search for a person's contact information (phone and email). Use when the user asks to find or look up someone's contact details.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "The person's first name"}
+                },
+                "required": ["name"]
+            }
+        }
+    }
+]
+
+# Map names to functions
+available_functions = {
+    "get_weather": get_weather,
+    "calculate_tip": calculate_tip,
+    "search_contacts": search_contacts,
+}
+
+def chat(user_input):
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant with access to tools. Use them when needed."},
+        {"role": "user", "content": user_input}
+    ]
+
+    # First API call
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages,
+        tools=tools,
+        temperature=0.0
+    )
+
+    response_message = response.choices[0].message
+
+    # Check if tools were called
+    if response_message.tool_calls:
+        messages.append(response_message)
+
+        for tool_call in response_message.tool_calls:
+            fn_name = tool_call.function.name
+            fn_args = json.loads(tool_call.function.arguments)
+            print(f"[Tool Called: {fn_name}({tool_call.function.arguments})]")
+
+            result = available_functions[fn_name](**fn_args)
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": result
+            })
+
+        # Second API call with tool results
+        final = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.0
+        )
+        print(f"Assistant: {final.choices[0].message.content}")
+    else:
+        print(f"Assistant: {response_message.content}")
+
+if __name__ == "__main__":
+    print("Assistant ready. Type 'exit' to quit.\n")
+    while True:
+        try:
+            user_text = input("You: ")
+            if user_text.lower() == "exit":
+                break
+            if not user_text.strip():
+                continue
+            chat(user_text)
+            print()
+        except (KeyboardInterrupt, EOFError):
+            break</code></pre>
+
+      <h3>5. Expected Output Sample</h3>
+      <pre><code>Assistant ready. Type 'exit' to quit.
+
+You: What's the weather in Bangalore?
+[Tool Called: get_weather({"city": "Bangalore"})]
+Assistant: The current weather in Bangalore is 28°C with partly cloudy skies.
+
+You: Calculate 18% tip on a 1200 rupee bill
+[Tool Called: calculate_tip({"bill_amount": 1200, "tip_percent": 18})]
+Assistant: An 18% tip on ₹1,200 would be ₹216. Your total would be ₹1,416.
+
+You: Find Priya's phone number
+[Tool Called: search_contacts({"name": "Priya"})]
+Assistant: Priya's phone number is +91-98765-43210 and her email is priya@example.com.
+
+You: What's the capital of France?
+Assistant: The capital of France is Paris.
+
+You: exit</code></pre>
+
+      <h3>6. Failure Scenario</h3>
+      <p>
+        Try this: remove the <code>description</code> field from the <code>calculate_tip</code> tool definition (or replace it with something vague like <code>"A math function"</code>). Now ask: <i>"How much tip should I leave on a 500 rupee bill at 10%?"</i>
+      </p>
+      <p>
+        Observe how the LLM might try to answer the question directly using mental math instead of calling the tool, or worse, call the wrong tool entirely. This demonstrates why clear, specific tool descriptions are critical.
+      </p>
+
+      <h3>7. Extension Challenge (Optional)</h3>
+      <p>
+        Add a 4th tool called <code>search_web(query)</code> that returns mock search results. Then try a query like: <i>"Search for the latest news about ISRO and summarize it."</i> Observe how the LLM chains the search result into a coherent answer. This is the basic building block of AI agents that browse the web.
+      </p>
+
+      <h3>8. Reflection Prompts</h3>
+      <ol>
+        <li>Why does the LLM need <b>two</b> API calls to answer a tool-based question instead of one? What is each call responsible for?</li>
+        <li>What would happen if you gave the LLM 100 tool definitions? How would that affect latency and accuracy? (Hint: Think about context windows and the needle-in-a-haystack problem from C1.1).</li>
+      </ol>
+    </section>
+  </div>
+
+</body>
+</html>
