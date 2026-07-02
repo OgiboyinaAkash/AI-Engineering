@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>C2.4: AI Workflow Orchestration, Tool Integration &amp; MCP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: monospace; padding: 12px; margin: 0; display: flex; gap: 24px; }
+    .toc { width: 220px; flex-shrink: 0; border-right: 1px solid #ccc; padding-right: 12px; }
+    .toc h3 { margin-top: 0; margin-bottom: 8px; }
+    .toc ul { list-style-type: none; padding-left: 0; margin-top: 0; margin-bottom: 20px; }
+    .toc li { margin-bottom: 8px; }
+    .main-content { flex-grow: 1; max-width: 80vw; }
+    code { display: block; background: #222; color: #eee; width: 80%; padding: 8px; overflow-x: auto; }
+    pre { background: #222; color: #eee; width: 80%; padding: 8px; margin: 0; overflow-x: auto; }
+    pre code { display: inline; background: none; color: inherit; padding: 0; width: auto; }
+    img { max-width: 80vw; }
+    hr { border: 0; border-top: 1px solid #ccc; margin: 24px 0; }
+    table { border-collapse: collapse; width: 80%; margin: 12px 0; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #eee; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+  </script>
+</head>
+<body>
+
+  <div class="toc">
+    <h3>Track 1</h3>
+    <ul>
+      <li><a href="C1.1.html">C1.1: Fundamentals &amp; APIs</a></li>
+      <li><a href="C1.2.html">C1.2: Prompt Engineering</a></li>
+      <li><a href="C1.3.html">C1.3: Building with APIs</a></li>
+      <li><a href="C1.4.html">C1.4: Tool Use &amp; Function Calling</a></li>
+      <li><a href="C1.5.html">C1.5: RAG &amp; Knowledge Grounding</a></li>
+      <li><a href="C1.6.html">C1.6: Capstone</a></li>
+    </ul>
+    <h3>Track 2</h3>
+    <ul>
+      <li><a href="C2.1.html">C2.1: Production RAG</a></li>
+      <li><a href="C2.2.html">C2.2: Vector DBs &amp; Hybrid Search</a></li>
+      <li><a href="C2.3.html">C2.3: Agents &amp; ReAct</a></li>
+      <li><a href="C2.4.html"><b>C2.4: Orchestration &amp; MCP</b></a></li>
+      <li><a href="C2.5.html">C2.5: Production APIs &amp; Security</a></li>
+      <li><a href="C2.6.html">C2.6: Capstone: Design Review</a></li>
+    </ul>
+
+    <h3>On This Page</h3>
+    <ul>
+      <li><a href="#langchain">1. LangChain Chains</a></li>
+      <li><a href="#llamaindex">2. LlamaIndex for RAG</a></li>
+      <li><a href="#mcp">3. Model Context Protocol (MCP)</a></li>
+      <li><a href="#multi-agent">4. Multi-Agent Systems</a></li>
+      <li><a href="#prompt-versioning">5. Prompt Versioning</a></li>
+      <li><a href="#lab">6. Lab: Orchestrated Workflow</a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <h1>AI Workflow Orchestration, Tool Integration &amp; MCP</h1>
+
+    <p>
+      So far, we've built everything from scratch — tool calling loops, RAG pipelines, agent loops. That's essential for understanding what's happening under the hood. But in production, you don't want to re-implement the ReAct loop for the 15th time, or hand-wire ChromaDB integrations into every new project.
+    </p>
+
+    <p>
+      This module is about <b>frameworks and protocols</b> that do the plumbing for you, so you can focus on the application logic. Think of it like this: in C2.3, you learned to build an engine from parts. Now you're learning to use a car — same engine underneath, but with a steering wheel and dashboard.
+    </p>
+
+    <hr>
+
+    <section id="langchain">
+      <h2>LangChain — Chains and LCEL</h2>
+
+      <p>
+        <b>LangChain</b> is the most popular framework for building LLM applications. It provides pre-built components for prompts, chains, memory, agents, and retrieval — and a way to compose them together.
+      </p>
+
+      <p>
+        The modern way to build with LangChain is <b>LCEL</b> (LangChain Expression Language) — a pipe-based syntax for chaining operations:
+      </p>
+
+      <pre><code># pip install langchain langchain-openai
+
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+# Define components
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant that translates {input_language} to {output_language}."),
+    ("user", "{text}")
+])
+
+model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+parser = StrOutputParser()
+
+# Chain them together with the pipe operator
+chain = prompt | model | parser
+
+# Run it
+result = chain.invoke({
+    "input_language": "English",
+    "output_language": "Hindi",
+    "text": "Good morning, how are you?"
+})
+
+print(result)  # "सुप्रभात, आप कैसे हैं?"</code></pre>
+
+      <p>
+        <i>See that <code>|</code> pipe operator?</i> That's LCEL. It reads left to right: take a prompt template, pipe it into the model, pipe the output into a string parser. Clean, composable, reusable.
+      </p>
+
+      <h3>Multi-Step Chains</h3>
+      <p>
+        The real power of chains is composing multiple LLM calls into a workflow:
+      </p>
+
+      <pre><code>from langchain_core.runnables import RunnablePassthrough
+
+# Step 1: Summarize a document
+summarize_prompt = ChatPromptTemplate.from_template(
+    "Summarize this document in 3 bullet points:\n{document}"
+)
+summarize_chain = summarize_prompt | model | parser
+
+# Step 2: Generate quiz questions from the summary
+quiz_prompt = ChatPromptTemplate.from_template(
+    "Based on this summary, create 3 quiz questions:\n{summary}"
+)
+quiz_chain = quiz_prompt | model | parser
+
+# Compose: document → summary → quiz questions
+full_chain = (
+    {"summary": summarize_chain, "document": RunnablePassthrough()}
+    | quiz_chain
+)
+
+result = full_chain.invoke({"document": "CloudNest offers three hosting plans..."})
+print(result)</code></pre>
+
+      <h3>LangChain Memory</h3>
+      <p>
+        Remember from C1.3 how you had to manually manage message history for multi-turn conversations? LangChain handles this with <b>memory</b> objects:
+      </p>
+
+      <pre><code>from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationChain
+
+memory = ConversationBufferMemory()
+conversation = ConversationChain(llm=model, memory=memory)
+
+print(conversation.predict(input="My name is Vikram."))
+print(conversation.predict(input="What's my name?"))
+# It remembers! No manual message history needed.</code></pre>
+    </section>
+
+    <hr>
+
+    <section id="llamaindex">
+      <h2>LlamaIndex — Purpose-Built for RAG</h2>
+
+      <p>
+        While LangChain is a general-purpose LLM framework, <b>LlamaIndex</b> (formerly GPT Index) is purpose-built for RAG. It handles document loading, chunking, indexing, and querying with minimal code.
+      </p>
+
+      <pre><code># pip install llama-index llama-index-llms-openai llama-index-embeddings-openai
+
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+
+# Load documents from a directory — handles PDF, TXT, DOCX, etc.
+documents = SimpleDirectoryReader("./company_docs/").load_data()
+
+# Build index (auto-chunks, auto-embeds, auto-stores)
+index = VectorStoreIndex.from_documents(documents)
+
+# Query — one line!
+query_engine = index.as_query_engine()
+response = query_engine.query("What is the refund policy for enterprise customers?")
+print(response)</code></pre>
+
+      <p>
+        <i>That's three lines to go from a folder of documents to a working RAG system.</i> Compare that to the 50+ lines we wrote in C1.5 and C2.1. LlamaIndex does the chunking, embedding, vector storage, retrieval, and prompt construction under the hood.
+      </p>
+
+      <p>
+        <i>So why did we build it manually first?</i> Because you need to understand what LlamaIndex is doing. When retrieval quality is bad, you need to know whether the problem is chunking, embedding, retrieval top-k, or the prompt. You can't debug a black box.
+      </p>
+
+      <h3>When to Use Which?</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Use Case</th>
+            <th>LangChain</th>
+            <th>LlamaIndex</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>RAG over documents</td>
+            <td>Possible but verbose</td>
+            <td><b>Purpose-built. Best choice.</b></td>
+          </tr>
+          <tr>
+            <td>Multi-step chains</td>
+            <td><b>LCEL makes this elegant</b></td>
+            <td>Possible but not the primary focus</td>
+          </tr>
+          <tr>
+            <td>Agent loops</td>
+            <td><b>Strong agent framework</b></td>
+            <td>Has agents but LangChain's are more mature</td>
+          </tr>
+          <tr>
+            <td>Conversation memory</td>
+            <td><b>Built-in memory types</b></td>
+            <td>Available but simpler</td>
+          </tr>
+          <tr>
+            <td>Document ingestion (PDF, DOCX)</td>
+            <td>Needs extra loaders</td>
+            <td><b>Built-in. Handles 20+ formats.</b></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr>
+
+    <section id="mcp">
+      <h2>Model Context Protocol (MCP)</h2>
+
+      <p>
+        Here's a problem that gets worse as AI systems grow: every LLM provider has its own tool calling format. OpenAI has one JSON schema. Anthropic has another. Google Gemini has yet another. If you build 5 tools for OpenAI, you can't just plug them into Claude without rewriting the schemas.
+      </p>
+
+      <p>
+        The <b>Model Context Protocol (MCP)</b> is a standard created by Anthropic that solves this. It defines a universal way for AI applications to connect to data sources and tools, regardless of which LLM is being used.
+      </p>
+
+      <p>
+        Think of MCP like USB for AI tools. Before USB, every device had a different connector. MCP gives tools a standard interface so any AI application can use them.
+      </p>
+
+      <h3>MCP Architecture</h3>
+      <div class="mermaid">
+flowchart LR
+    subgraph Client [AI App Client]
+        A[Claude / GPT-4 / Gemini]
+    end
+    subgraph Server [MCP Server]
+        B[Weather API / Database / Files]
+    end
+    Client <-->|MCP Protocol JSON-RPC| Server
+      </div>
+
+      <p>Key concepts:</p>
+      <ul>
+        <li><b>MCP Server:</b> A lightweight process that wraps your tools. It exposes them via a standard JSON-RPC interface.</li>
+        <li><b>MCP Client:</b> Your AI application. It discovers available tools from the server and uses them.</li>
+        <li><b>Transport:</b> MCP servers can communicate over stdio (local) or HTTP/SSE (remote).</li>
+      </ul>
+
+      <h3>Building a Simple MCP Server</h3>
+      <pre><code># pip install mcp
+
+from mcp.server import Server
+from mcp.types import Tool, TextContent
+import json
+
+server = Server("weather-server")
+
+@server.tool()
+async def get_weather(city: str) -> list[TextContent]:
+    """Get current weather for a city."""
+    weather_data = {
+        "Bangalore": {"temp": 28, "condition": "Partly Cloudy"},
+        "Mumbai": {"temp": 33, "condition": "Humid"},
+    }
+    data = weather_data.get(city, {"temp": 25, "condition": "Unknown"})
+    return [TextContent(type="text", text=json.dumps(data))]
+
+@server.tool()
+async def calculate(expression: str) -> list[TextContent]:
+    """Evaluate a mathematical expression safely."""
+    try:
+        # Only allow safe math operations
+        result = eval(expression, {"__builtins__": {}}, {})
+        return [TextContent(type="text", text=str(result))]
+    except Exception as e:
+        return [TextContent(type="text", text=f"Error: {e}")]
+
+if __name__ == "__main__":
+    import asyncio
+    from mcp.server.stdio import stdio_server
+
+    async def main():
+        async with stdio_server() as (read, write):
+            await server.run(read, write)
+
+    asyncio.run(main())</code></pre>
+
+      <p>
+        Once your MCP server is running, any MCP-compatible client (Claude Desktop, VS Code with Copilot, custom applications) can discover and use your tools — without you writing provider-specific integration code.
+      </p>
+
+      <p>
+        <i>This is a newer protocol and the ecosystem is still growing.</i> But it's worth learning now because it's becoming the standard for tool integration. Claude Desktop, Cursor, and many IDE plugins already support MCP natively.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="multi-agent">
+      <h2>Multi-Agent Systems</h2>
+
+      <p>
+        In C2.3, we built single agents. But some tasks are better handled by <b>multiple specialized agents working together</b>. The most practical pattern is <b>coordinator + specialist</b>:
+      </p>
+
+      <div class="mermaid">
+flowchart TD
+    A[User Task] --> B[Coordinator Agent]
+    B -->|Delegates Research| C[Research Specialist]
+    C -->|Returns Data| B
+    B -->|Delegates Writing| D[Writing Specialist]
+    D -->|Returns Draft| B
+    B --> E[Final Answer]
+      </div>
+
+      <p>Here's a simplified implementation:</p>
+
+      <pre><code>def run_specialist(specialist_name, system_prompt, task):
+    """Run a specialist agent with a specific role"""
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": task}
+        ],
+        temperature=0.0
+    )
+    return response.choices[0].message.content
+
+def coordinator(user_task):
+    """Coordinator breaks task into subtasks and delegates"""
+
+    # Step 1: Research
+    research = run_specialist(
+        "researcher",
+        "You are a research analyst. Find key facts and data points.",
+        f"Research the following: {user_task}"
+    )
+    print(f"[Researcher]: {research[:100]}...")
+
+    # Step 2: Writing
+    report = run_specialist(
+        "writer",
+        "You are a technical writer. Create clear, well-structured reports.",
+        f"Write a report based on this research:\n{research}"
+    )
+    print(f"[Writer]: {report[:100]}...")
+
+    return report
+
+result = coordinator("Compare CloudNest pricing to AWS and DigitalOcean")</code></pre>
+
+      <p>
+        <b>When multi-agent is justified:</b> When tasks are naturally decomposable into specialized roles (research + writing, analysis + visualization, coding + testing). <b>When it's overkill:</b> When a single agent with good tools can handle the task. Don't add complexity for complexity's sake.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="prompt-versioning">
+      <h2>Prompt Versioning &amp; Management</h2>
+
+      <p>
+        In production, your prompts are code. They need version control, testing, and documented iterations — just like any other software component.
+      </p>
+
+      <pre><code>import json
+import datetime
+
+class PromptRegistry:
+    def __init__(self, registry_file="prompt_registry.json"):
+        self.file = registry_file
+        self.prompts = self._load()
+
+    def _load(self):
+        try:
+            with open(self.file) as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return {}
+
+    def _save(self):
+        with open(self.file, "w") as f:
+            json.dump(self.prompts, f, indent=2)
+
+    def register(self, name, version, template, notes=""):
+        key = f"{name}:{version}"
+        self.prompts[key] = {
+            "name": name,
+            "version": version,
+            "template": template,
+            "notes": notes,
+            "created": datetime.datetime.now().isoformat(),
+            "active": True
+        }
+        self._save()
+        print(f"Registered: {key}")
+
+    def get(self, name, version="latest"):
+        if version == "latest":
+            versions = [k for k in self.prompts if k.startswith(f"{name}:")]
+            if not versions:
+                raise KeyError(f"No prompt found: {name}")
+            key = sorted(versions)[-1]
+        else:
+            key = f"{name}:{version}"
+        return self.prompts[key]["template"]
+
+    def list_versions(self, name):
+        versions = {k: v for k, v in self.prompts.items() if k.startswith(f"{name}:")}
+        for key, data in versions.items():
+            print(f"  {key} | {data['notes']} | {data['created'][:10]}")
+
+# Usage
+registry = PromptRegistry()
+
+registry.register("rag_system", "v1.0",
+    "You are a helpful assistant. Answer questions based on the context provided.",
+    notes="Initial baseline")
+
+registry.register("rag_system", "v1.1",
+    "You are a helpful assistant. Answer ONLY based on the context below. If unsure, say 'I don't know.'",
+    notes="Added grounding instruction — accuracy improved 60% → 85%")
+
+registry.register("rag_system", "v1.2",
+    "You are a CloudNest support assistant. Answer ONLY from the context. Be concise (max 2 sentences). Cite the source document.",
+    notes="Added role, conciseness, citations — accuracy 85% → 93%")
+
+print("\nAll versions:")
+registry.list_versions("rag_system")
+
+# Use in production
+current_prompt = registry.get("rag_system", "latest")
+print(f"\nActive prompt: {current_prompt}")</code></pre>
+
+      <p>
+        This registry pattern gives you a clean way to track prompt evolution, roll back to previous versions if a new prompt degrades quality, and A/B test different prompt versions in production.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="lab">
+      <h2>Lab: Orchestrated AI Workflow</h2>
+
+      <h3>1. Problem Setup</h3>
+      <p>
+        Build a multi-step AI workflow that takes a user's question about CloudNest, retrieves relevant documents, generates an answer, and logs the prompt version used. Use LangChain LCEL for the chain and implement prompt versioning.
+      </p>
+
+      <h3>2. Environment Setup</h3>
+      <pre><code>pip install langchain langchain-openai chromadb python-dotenv mcp</code></pre>
+
+      <h3>3. Step-by-Step Instructions</h3>
+      <ol>
+        <li>Set up a LangChain LCEL chain: prompt template → model → output parser.</li>
+        <li>Add retrieval from ChromaDB as the first step in the chain.</li>
+        <li>Implement the prompt registry with at least 2 prompt versions.</li>
+        <li>Build a simple MCP server with 2 tools (weather + calculator).</li>
+        <li>Create a coordinator that uses the RAG chain for document questions and the MCP tools for other tasks.</li>
+        <li>Test the full workflow with 5 queries mixing document questions and tool-based questions.</li>
+      </ol>
+
+      <h3>4. Starter Code</h3>
+      <pre><code>import os
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+import chromadb
+
+load_dotenv()
+
+# --- ChromaDB Setup ---
+chroma = chromadb.Client()
+collection = chroma.create_collection(name="cloudnest_kb")
+docs = [
+    "CloudNest Pro plan costs ₹1,499/month with 2 vCPUs and 4 GB RAM.",
+    "Enterprise plan includes dedicated account manager and 24/7 priority support.",
+    "All plans include free SSL certificates and daily backups.",
+    "Refund window: Starter 14 days, Pro 30 days, Enterprise 90 days.",
+    "Data centers in Mumbai, Bangalore, and Singapore.",
+]
+collection.add(documents=docs, ids=[f"d{i}" for i in range(len(docs))])
+
+# --- Retrieval Function ---
+def retrieve(question: str) -> str:
+    results = collection.query(query_texts=[question], n_results=3)
+    return "\n---\n".join(results["documents"][0])
+
+# --- LangChain LCEL Chain ---
+model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+parser = StrOutputParser()
+
+rag_prompt = ChatPromptTemplate.from_template(
+    """Answer based ONLY on this context. If unsure, say "I don't know."
+
+Context:
+{context}
+
+Question: {question}
+Answer:"""
+)
+
+rag_chain = (
+    {"context": lambda x: retrieve(x["question"]), "question": lambda x: x["question"]}
+    | rag_prompt
+    | model
+    | parser
+)
+
+# --- Test ---
+test_questions = [
+    "How much does the Pro plan cost?",
+    "Where are the data centers?",
+    "What is the refund window for Enterprise?",
+    "Does CloudNest offer GPU instances?",
+    "What support does Enterprise get?",
+]
+
+print("--- LangChain LCEL RAG Chain ---\n")
+for q in test_questions:
+    answer = rag_chain.invoke({"question": q})
+    print(f"Q: {q}")
+    print(f"A: {answer}\n")</code></pre>
+
+      <h3>5. Expected Output Sample</h3>
+      <pre><code>--- LangChain LCEL RAG Chain ---
+
+Q: How much does the Pro plan cost?
+A: The CloudNest Pro plan costs ₹1,499/month with 2 vCPUs and 4 GB RAM.
+
+Q: Where are the data centers?
+A: CloudNest data centers are located in Mumbai, Bangalore, and Singapore.
+
+Q: What is the refund window for Enterprise?
+A: The Enterprise plan has a 90-day refund window.
+
+Q: Does CloudNest offer GPU instances?
+A: I don't know.
+
+Q: What support does Enterprise get?
+A: Enterprise plan includes a dedicated account manager and 24/7 priority support.</code></pre>
+
+      <h3>6. Failure Scenario</h3>
+      <p>
+        Use a legacy LangChain pattern (e.g., <code>LLMChain</code>) instead of LCEL and observe the deprecation warnings. This demonstrates why staying current with framework patterns matters — LangChain's API changes frequently.
+      </p>
+
+      <h3>7. Extension Challenge (Optional)</h3>
+      <p>
+        Replace ChromaDB with LlamaIndex's <code>VectorStoreIndex</code> for the retrieval step. Compare the code complexity and verify that the answers are equivalent. Document which approach you'd choose for a production project and why.
+      </p>
+
+      <h3>8. Reflection Prompts</h3>
+      <ol>
+        <li>When would you use MCP for tool integration vs direct tool calling (C1.4 style) vs LangChain agents? Give a concrete example where each is the right choice.</li>
+        <li>Your RAG system's prompt has gone through 8 versions over 3 months. How does the prompt registry help you manage this? What would happen without version tracking?</li>
+      </ol>
+    </section>
+  </div>
+
+</body>
+</html>

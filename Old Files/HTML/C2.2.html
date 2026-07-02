@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>C2.2: Vector Databases, Retrieval Quality &amp; Hybrid Search</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: monospace; padding: 12px; margin: 0; display: flex; gap: 24px; }
+    .toc { width: 220px; flex-shrink: 0; border-right: 1px solid #ccc; padding-right: 12px; }
+    .toc h3 { margin-top: 0; margin-bottom: 8px; }
+    .toc ul { list-style-type: none; padding-left: 0; margin-top: 0; margin-bottom: 20px; }
+    .toc li { margin-bottom: 8px; }
+    .main-content { flex-grow: 1; max-width: 80vw; }
+    code { display: block; background: #222; color: #eee; width: 80%; padding: 8px; overflow-x: auto; }
+    pre { background: #222; color: #eee; width: 80%; padding: 8px; margin: 0; overflow-x: auto; }
+    pre code { display: inline; background: none; color: inherit; padding: 0; width: auto; }
+    img { max-width: 80vw; }
+    hr { border: 0; border-top: 1px solid #ccc; margin: 24px 0; }
+    table { border-collapse: collapse; width: 80%; margin: 12px 0; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #eee; }
+  </style>
+</head>
+<body>
+
+  <div class="toc">
+    <h3>Track 1</h3>
+    <ul>
+      <li><a href="C1.1.html">C1.1: Fundamentals &amp; APIs</a></li>
+      <li><a href="C1.2.html">C1.2: Prompt Engineering</a></li>
+      <li><a href="C1.3.html">C1.3: Building with APIs</a></li>
+      <li><a href="C1.4.html">C1.4: Tool Use &amp; Function Calling</a></li>
+      <li><a href="C1.5.html">C1.5: RAG &amp; Knowledge Grounding</a></li>
+      <li><a href="C1.6.html">C1.6: Capstone</a></li>
+    </ul>
+    <h3>Track 2</h3>
+    <ul>
+      <li><a href="C2.1.html">C2.1: Production RAG</a></li>
+      <li><a href="C2.2.html"><b>C2.2: Vector DBs &amp; Hybrid Search</b></a></li>
+      <li><a href="C2.3.html">C2.3: Agents &amp; ReAct</a></li>
+      <li><a href="C2.4.html">C2.4: Orchestration &amp; MCP</a></li>
+      <li><a href="C2.5.html">C2.5: Production APIs &amp; Security</a></li>
+      <li><a href="C2.6.html">C2.6: Capstone: Design Review</a></li>
+    </ul>
+
+    <h3>On This Page</h3>
+    <ul>
+      <li><a href="#vector-db-fundamentals">1. Vector DB Fundamentals</a></li>
+      <li><a href="#metadata-filtering">2. Metadata Filtering</a></li>
+      <li><a href="#hybrid-search">3. Hybrid Search &amp; Reranking</a></li>
+      <li><a href="#retrieval-metrics">4. Retrieval Quality Metrics</a></li>
+      <li><a href="#lab">5. Lab: Vector DB &amp; Retrieval Quality</a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <h1>Vector Databases, Retrieval Quality &amp; Hybrid Search</h1>
+
+    <p>
+      In C2.1, we focused on getting documents <i>into</i> a vector database and getting chunks <i>out</i>. That works great for a 50-document knowledge base. But what happens when your company has 10,000 documents across 15 product lines, written over 5 years by different teams?
+    </p>
+
+    <p>
+      Suddenly, "find the most similar chunks" isn't good enough. You need to filter by product, by date, by document type. You need to combine keyword search with semantic search. And you absolutely need to <i>measure</i> whether your retrieval is actually working — not just eyeball it.
+    </p>
+
+    <p>
+      That's what this module is about.
+    </p>
+
+    <hr>
+
+    <section id="vector-db-fundamentals">
+      <h2>Vector DB Fundamentals: Local vs Hosted</h2>
+
+      <p>
+        You've used ChromaDB — a local, in-memory vector database. It's fantastic for development. But in production, you need persistence, scalability, and sometimes multi-tenant access. Let's compare the options:
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>ChromaDB (Local)</th>
+            <th>Pinecone (Cloud)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Setup</b></td>
+            <td><code>pip install chromadb</code> — done.</td>
+            <td>Create account, get API key, configure index.</td>
+          </tr>
+          <tr>
+            <td><b>Persistence</b></td>
+            <td>Optional (file-based). Data gone if in-memory.</td>
+            <td>Always persistent. Managed cloud storage.</td>
+          </tr>
+          <tr>
+            <td><b>Scale</b></td>
+            <td>Works well up to ~100K vectors on a single machine.</td>
+            <td>Billions of vectors. Auto-scaling.</td>
+          </tr>
+          <tr>
+            <td><b>Cost</b></td>
+            <td>Free forever.</td>
+            <td>Free tier available; paid tiers for production.</td>
+          </tr>
+          <tr>
+            <td><b>Best for</b></td>
+            <td>Development, prototypes, small production apps.</td>
+            <td>Large-scale production with many users.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>ChromaDB with Persistence</h3>
+      <p>
+        In C1.5, we used in-memory ChromaDB — data vanished when the script ended. For production, use persistent storage:
+      </p>
+      <pre><code>import chromadb
+
+# Persistent storage — data survives restarts
+client = chromadb.PersistentClient(path="./chroma_db")
+
+# Get or create a collection (idempotent)
+collection = client.get_or_create_collection(
+    name="knowledge_base",
+    metadata={"hnsw:space": "cosine"}  # Use cosine similarity
+)
+
+# Add documents with metadata
+collection.add(
+    documents=["Premium plan refund window is 60 days.", "Standard plan refund window is 30 days."],
+    metadatas=[
+        {"source": "refund_policy.pdf", "category": "billing", "year": 2026},
+        {"source": "refund_policy.pdf", "category": "billing", "year": 2026}
+    ],
+    ids=["ref_001", "ref_002"]
+)
+
+print(f"Collection has {collection.count()} documents.")</code></pre>
+
+      <p>
+        <i>Notice the <code>metadatas</code> parameter?</i> That's new. Each document now carries structured metadata alongside its embedding. This is the key to the next section.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="metadata-filtering">
+      <h2>Metadata Filtering — Precision Beyond Semantics</h2>
+
+      <p>
+        Here's a real production problem: Priya works at a company with 50 product lines. She asks the RAG system: <i>"What's the pricing for the Pro plan?"</i> The retriever returns chunks about "Pro plan" pricing — but from 3 different products. The LLM mashes them together into a confused answer that's partially wrong for all of them.
+      </p>
+
+      <p>
+        <b>Metadata filtering</b> solves this. Instead of searching the entire vector space, you first narrow down to a subset using structured filters (product name, date, category) and then do semantic search within that subset.
+      </p>
+
+      <pre><code># Add documents with rich metadata
+collection.add(
+    documents=[
+        "CloudNest Pro hosting costs ₹1,499/month.",
+        "CloudNest Pro email costs ₹299/month.",
+        "CloudNest Pro storage costs ₹699/month.",
+        "CloudNest Starter hosting costs ₹499/month.",
+    ],
+    metadatas=[
+        {"product": "hosting", "plan": "pro", "type": "pricing"},
+        {"product": "email", "plan": "pro", "type": "pricing"},
+        {"product": "storage", "plan": "pro", "type": "pricing"},
+        {"product": "hosting", "plan": "starter", "type": "pricing"},
+    ],
+    ids=["h_pro", "e_pro", "s_pro", "h_starter"]
+)
+
+# Query WITH metadata filter — only search within hosting products
+results = collection.query(
+    query_texts=["What does the Pro plan cost?"],
+    where={"product": "hosting"},  # Filter BEFORE semantic search
+    n_results=2
+)
+
+print(results["documents"])
+# Only returns hosting-related Pro plan pricing, not email or storage</code></pre>
+
+      <p>
+        <i>Think of it like this:</i> Without metadata filtering, you're searching a library with no sections — every book is mixed together. With metadata filtering, you walk to the "Hosting" shelf first, <i>then</i> look for "Pro plan pricing" within that shelf. Much more precise.
+      </p>
+
+      <p>
+        ChromaDB supports powerful filter operators:
+      </p>
+
+      <pre><code># AND: Multiple conditions
+results = collection.query(
+    query_texts=["pricing"],
+    where={"$and": [{"product": "hosting"}, {"plan": "pro"}]},
+    n_results=3
+)
+
+# OR: Match any condition
+results = collection.query(
+    query_texts=["pricing"],
+    where={"$or": [{"plan": "pro"}, {"plan": "enterprise"}]},
+    n_results=3
+)
+
+# Comparison: Filter by year
+results = collection.query(
+    query_texts=["refund policy"],
+    where={"year": {"$gte": 2025}},  # Only docs from 2025 onwards
+    n_results=3
+)</code></pre>
+    </section>
+
+    <hr>
+
+    <section id="hybrid-search">
+      <h2>Hybrid Search &amp; Reranking</h2>
+
+      <p>
+        Semantic search is great at understanding meaning but can miss exact terms. Keyword search is great at exact matches but has zero understanding of meaning. <b>Hybrid search</b> combines both.
+      </p>
+
+      <p>
+        Consider this: a user asks for <i>"error code ERR-4521"</i>. Semantic search might return chunks about "errors" and "troubleshooting" in general — because those are semantically similar. But the user wants the specific error code. Keyword search would find <code>ERR-4521</code> exactly. Hybrid search does both and merges the results.
+      </p>
+
+      <h3>Simple Hybrid Search Implementation</h3>
+      <pre><code>def keyword_search(documents, query, top_k=3):
+    """Simple BM25-like keyword matching"""
+    query_terms = query.lower().split()
+    scores = []
+    for i, doc in enumerate(documents):
+        doc_lower = doc.lower()
+        score = sum(1 for term in query_terms if term in doc_lower)
+        scores.append((i, score))
+    scores.sort(key=lambda x: x[1], reverse=True)
+    return [documents[i] for i, _ in scores[:top_k]]
+
+def hybrid_search(collection, documents, query, top_k=3):
+    """Combine semantic (vector) and keyword search results"""
+    # Semantic results
+    semantic_results = collection.query(query_texts=[query], n_results=top_k)
+    semantic_docs = set(semantic_results["documents"][0])
+    
+    # Keyword results
+    keyword_docs = set(keyword_search(documents, query, top_k))
+    
+    # Merge: prioritize docs found by BOTH methods
+    both = semantic_docs & keyword_docs
+    semantic_only = semantic_docs - keyword_docs
+    keyword_only = keyword_docs - semantic_docs
+    
+    merged = list(both) + list(semantic_only) + list(keyword_only)
+    return merged[:top_k]</code></pre>
+
+      <h3>Reranking — The Quality Multiplier</h3>
+      <p>
+        After retrieving candidate chunks (from semantic, keyword, or hybrid search), you can run a <b>reranker</b> — a model that scores how well each chunk actually answers the query. The reranker re-orders the chunks by relevance quality, not just embedding similarity.
+      </p>
+
+      <p>
+        A simple LLM-based reranker:
+      </p>
+
+      <pre><code>def rerank_with_llm(query, chunks, top_k=3):
+    """Use LLM to score relevance of each chunk to the query"""
+    scored = []
+    for chunk in chunks:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Rate how relevant the following document chunk is to the query. Respond with ONLY a number from 0 to 10."},
+                {"role": "user", "content": f"Query: {query}\n\nChunk: {chunk}"}
+            ],
+            temperature=0.0
+        )
+        try:
+            score = float(response.choices[0].message.content.strip())
+        except ValueError:
+            score = 0
+        scored.append((chunk, score))
+    
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return [chunk for chunk, _ in scored[:top_k]]</code></pre>
+
+      <p>
+        <i>This is expensive</i> — one LLM call per chunk per query. In production, you'd use a specialised cross-encoder model (like <code>cross-encoder/ms-marco-MiniLM-L-6-v2</code>) that's much faster and cheaper. But the LLM-based approach works for learning and small-scale systems.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="retrieval-metrics">
+      <h2>Retrieval Quality Metrics</h2>
+
+      <p>
+        <i>"My retrieval works fine — I tested it on 3 queries and it looked good."</i>
+      </p>
+
+      <p>
+        That's not engineering. To build reliable RAG systems, you need <b>quantitative metrics</b> against a <b>labeled evaluation set</b>. Here are the metrics that matter:
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>What It Measures</th>
+            <th>Formula (Intuitive)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Recall@k</b></td>
+            <td>Of all the relevant chunks that exist, how many did we find in the top-k results?</td>
+            <td>relevant_found / total_relevant</td>
+          </tr>
+          <tr>
+            <td><b>Precision@k</b></td>
+            <td>Of the k results we returned, how many are actually relevant?</td>
+            <td>relevant_found / k</td>
+          </tr>
+          <tr>
+            <td><b>MRR (Mean Reciprocal Rank)</b></td>
+            <td>How high up in the results is the first relevant chunk?</td>
+            <td>Average of 1/rank_of_first_relevant across queries</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Here's how to compute them:</p>
+
+      <pre><code>def compute_retrieval_metrics(eval_set, collection, top_k=5):
+    """
+    eval_set: list of {"query": str, "relevant_ids": [str]}
+    """
+    recalls = []
+    precisions = []
+    reciprocal_ranks = []
+    
+    for case in eval_set:
+        results = collection.query(query_texts=[case["query"]], n_results=top_k)
+        retrieved_ids = results["ids"][0]
+        relevant_ids = set(case["relevant_ids"])
+        
+        # Recall@k
+        found = len(relevant_ids & set(retrieved_ids))
+        recall = found / len(relevant_ids) if relevant_ids else 0
+        recalls.append(recall)
+        
+        # Precision@k
+        precision = found / top_k
+        precisions.append(precision)
+        
+        # MRR
+        rr = 0
+        for rank, rid in enumerate(retrieved_ids, 1):
+            if rid in relevant_ids:
+                rr = 1 / rank
+                break
+        reciprocal_ranks.append(rr)
+    
+    print(f"Recall@{top_k}:    {sum(recalls)/len(recalls):.3f}")
+    print(f"Precision@{top_k}: {sum(precisions)/len(precisions):.3f}")
+    print(f"MRR:            {sum(reciprocal_ranks)/len(reciprocal_ranks):.3f}")</code></pre>
+
+      <p>
+        <b>What good numbers look like:</b> For a well-tuned RAG system, Recall@5 above 0.85 and MRR above 0.7 are solid targets. If your Recall@5 is below 0.6, your retrieval has a serious problem — the LLM is flying blind on 40% of queries.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="lab">
+      <h2>Lab: Vector DB &amp; Retrieval Quality</h2>
+
+      <h3>1. Problem Setup</h3>
+      <p>
+        Extend the C2.1 RAG pipeline with ChromaDB persistence, metadata filtering, and hybrid search. Measure retrieval quality against a labeled evaluation set using Recall@k, Precision@k, and MRR.
+      </p>
+
+      <h3>2. Environment Setup</h3>
+      <pre><code>pip install openai chromadb python-dotenv numpy</code></pre>
+
+      <h3>3. Step-by-Step Instructions</h3>
+      <ol>
+        <li>Use the 50-document CloudNest corpus from C2.1.</li>
+        <li>Add metadata to every document: <code>category</code> (billing, support, security, infrastructure) and <code>plan</code> (starter, pro, enterprise, all).</li>
+        <li>Use persistent ChromaDB storage.</li>
+        <li>Create a labeled eval set: 10 queries, each with the IDs of the expected relevant documents.</li>
+        <li>Measure baseline retrieval metrics (semantic only).</li>
+        <li>Add metadata filtering and measure improvement.</li>
+        <li>Implement hybrid search and measure again.</li>
+        <li>Report all three metric sets side by side.</li>
+      </ol>
+
+      <h3>4. Starter Code</h3>
+      <pre><code>import chromadb
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# --- Persistent ChromaDB ---
+client = chromadb.PersistentClient(path="./chroma_lab")
+collection = client.get_or_create_collection(name="cloudnest_with_metadata")
+
+# --- Add documents with metadata (sample — use full C2.1 corpus) ---
+docs_with_meta = [
+    {"text": "CloudNest Starter plan costs ₹499/month with 1 vCPU.", "category": "billing", "plan": "starter"},
+    {"text": "CloudNest Pro plan costs ₹1,499/month with 2 vCPUs.", "category": "billing", "plan": "pro"},
+    {"text": "Enterprise plan costs ₹4,999/month with dedicated resources.", "category": "billing", "plan": "enterprise"},
+    {"text": "All plans include free SSL certificates.", "category": "security", "plan": "all"},
+    {"text": "Pro plan refunds within 30 days.", "category": "billing", "plan": "pro"},
+    {"text": "Enterprise plan refunds within 90 days.", "category": "billing", "plan": "enterprise"},
+    {"text": "SSH access available on all plans.", "category": "infrastructure", "plan": "all"},
+    {"text": "Docker deployment on Pro and Enterprise.", "category": "infrastructure", "plan": "pro"},
+    {"text": "24/7 support for Pro and Enterprise.", "category": "support", "plan": "pro"},
+    {"text": "Starter support 9 AM - 6 PM IST.", "category": "support", "plan": "starter"},
+]
+
+if collection.count() == 0:
+    collection.add(
+        documents=[d["text"] for d in docs_with_meta],
+        metadatas=[{"category": d["category"], "plan": d["plan"]} for d in docs_with_meta],
+        ids=[f"doc_{i}" for i in range(len(docs_with_meta))]
+    )
+
+# --- Labeled Evaluation Set ---
+labeled_eval = [
+    {"query": "How much does the Pro plan cost?", "relevant_ids": ["doc_1"]},
+    {"query": "What's the Enterprise refund policy?", "relevant_ids": ["doc_5"]},
+    {"query": "Does CloudNest support Docker?", "relevant_ids": ["doc_7"]},
+    {"query": "What support hours does Starter get?", "relevant_ids": ["doc_9"]},
+    {"query": "Is SSL included?", "relevant_ids": ["doc_3"]},
+]
+
+# --- Baseline: Semantic Only ---
+print("=== Baseline (Semantic Only) ===")
+for case in labeled_eval:
+    results = collection.query(query_texts=[case["query"]], n_results=3)
+    found = any(rid in case["relevant_ids"] for rid in results["ids"][0])
+    print(f"  {'✓' if found else '✗'} {case['query']}")
+
+# --- With Metadata Filter ---
+print("\n=== With Metadata Filter (billing only for pricing questions) ===")
+results = collection.query(
+    query_texts=["How much does the Pro plan cost?"],
+    where={"category": "billing"},
+    n_results=3
+)
+print(f"  Filtered results: {results['documents'][0]}")
+
+# --- TODO: Implement hybrid search and compute full metrics ---
+print("\n[Implement hybrid search and compute Recall@k, Precision@k, MRR here]")</code></pre>
+
+      <h3>5. Expected Output Sample</h3>
+      <pre><code>=== Baseline (Semantic Only) ===
+  ✓ How much does the Pro plan cost?
+  ✓ What's the Enterprise refund policy?
+  ✓ Does CloudNest support Docker?
+  ✗ What support hours does Starter get?
+  ✓ Is SSL included?
+
+=== With Metadata Filter (billing only for pricing questions) ===
+  Filtered results: ['CloudNest Pro plan costs ₹1,499/month with 2 vCPUs.',
+                      'Enterprise plan costs ₹4,999/month with dedicated resources.',
+                      'Pro plan refunds within 30 days.']
+
+=== Metrics Comparison ===
+            Semantic  | + Metadata | + Hybrid
+Recall@3:   0.80      |   0.90     |  0.95
+Precision@3: 0.27     |   0.33     |  0.40
+MRR:         0.73     |   0.87     |  0.93</code></pre>
+
+      <h3>6. Failure Scenario</h3>
+      <p>
+        Query for a specific error code like "ERR-4521" using only semantic search. Observe how it returns general "error handling" chunks instead of the specific error. Then add keyword-based hybrid search and watch it find the exact match. This demonstrates when semantic search alone isn't enough.
+      </p>
+
+      <h3>7. Extension Challenge (Optional)</h3>
+      <p>
+        Implement the LLM-based reranker from the Hybrid Search section. After retrieving top-5 chunks, rerank them and keep top-3. Measure whether reranking improves Precision@3 and MRR compared to the raw retrieval order.
+      </p>
+
+      <h3>8. Reflection Prompts</h3>
+      <ol>
+        <li>When would metadata filtering alone outperform hybrid search? (Hint: Think about cases where the document structure is very well-defined vs cases where it's messy.)</li>
+        <li>You're building a RAG system for 10 million documents. Would you choose ChromaDB or Pinecone? What factors would determine your choice?</li>
+      </ol>
+    </section>
+  </div>
+
+</body>
+</html>

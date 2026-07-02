@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>C1.6: Capstone — Domain AI Assistant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: monospace;
+      padding: 12px;
+      margin: 0;
+      display: flex;
+      gap: 24px;
+    }
+
+    .toc {
+      width: 220px;
+      flex-shrink: 0;
+      border-right: 1px solid #ccc;
+      padding-right: 12px;
+    }
+
+    .toc h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    .toc ul {
+      list-style-type: none;
+      padding-left: 0;
+      margin-top: 0;
+      margin-bottom: 20px;
+    }
+
+    .toc li {
+      margin-bottom: 8px;
+    }
+
+    .main-content {
+      flex-grow: 1;
+      max-width: 80vw;
+    }
+
+    code {
+      display: block;
+      background: #222;
+      color: #eee;
+      width: 80%;
+      padding: 8px;
+      overflow-x: auto;
+    }
+
+    pre {
+      background: #222;
+      color: #eee;
+      width: 80%;
+      padding: 8px;
+      margin: 0;
+      overflow-x: auto;
+    }
+
+    pre code {
+      display: inline;
+      background: none;
+      color: inherit;
+      padding: 0;
+      width: auto;
+    }
+
+    img {
+      max-width: 80vw;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid #ccc;
+      margin: 24px 0;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 80%;
+      margin: 12px 0;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #eee;
+    }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+  </script>
+</head>
+<body>
+
+  <!-- Left Sidebar Table of Contents -->
+  <div class="toc">
+    <h3>Track 1</h3>
+    <ul>
+      <li><a href="C1.1.html">C1.1: Fundamentals &amp; APIs</a></li>
+      <li><a href="C1.2.html">C1.2: Prompt Engineering</a></li>
+      <li><a href="C1.3.html">C1.3: Building with APIs</a></li>
+      <li><a href="C1.4.html">C1.4: Tool Use &amp; Function Calling</a></li>
+      <li><a href="C1.5.html">C1.5: RAG &amp; Knowledge Grounding</a></li>
+      <li><a href="C1.6.html"><b>C1.6: Capstone</b></a></li>
+    </ul>
+    <h3>Track 2</h3>
+    <ul>
+      <li><a href="C2.1.html">C2.1: Production RAG</a></li>
+      <li><a href="C2.2.html">C2.2: Vector DBs &amp; Hybrid Search</a></li>
+      <li><a href="C2.3.html">C2.3: Agents &amp; ReAct</a></li>
+      <li><a href="C2.4.html">C2.4: Orchestration &amp; MCP</a></li>
+      <li><a href="C2.5.html">C2.5: Production APIs &amp; Security</a></li>
+      <li><a href="C2.6.html">C2.6: Capstone: Design Review</a></li>
+    </ul>
+
+    <h3>On This Page</h3>
+    <ul>
+      <li><a href="#capstone-overview">1. Capstone Overview</a></li>
+      <li><a href="#domain-options">2. Choose Your Domain</a></li>
+      <li><a href="#architecture">3. Architecture Blueprint</a></li>
+      <li><a href="#requirements">4. Required Components</a></li>
+      <li><a href="#evaluation">5. Evaluation &amp; Iteration</a></li>
+      <li><a href="#demo-review">6. Demo Review</a></li>
+      <li><a href="#portfolio">7. Portfolio Deliverables</a></li>
+    </ul>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="main-content">
+    <h1>Capstone — Domain AI Assistant</h1>
+
+    <section id="capstone-overview">
+      <h2>Capstone Overview</h2>
+      <p>
+        This is it. Everything you've learned across Track 1 — how LLMs work under the hood (C1.1), how to craft reliable prompts (C1.2), how to integrate APIs with streaming and error handling (C1.3), how to give LLMs tools to act in the world (C1.4), and how to ground responses in real documents using RAG (C1.5) — all comes together here.
+      </p>
+
+      <p>
+        You're going to build a <b>domain-specific Q&amp;A assistant</b> that can answer questions accurately over a small document set. Not a toy demo. A working system with real prompts, real retrieval, real evaluation, and a real demo.
+      </p>
+
+      <p>
+        <i>But wait — haven't we already built something like this in C1.5?</i>
+      </p>
+
+      <p>
+        Yes, but the C1.5 lab was a guided walkthrough with mock data. This capstone is different. You choose the domain. You curate the documents. You design the prompts. You measure the quality. You improve what's broken. And you present your work to a reviewer like you would to a tech lead at a company.
+      </p>
+
+      <p>
+        Think of C1.5 as learning to ride a bicycle in a parking lot. The capstone is your first real ride through the city.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="domain-options">
+      <h2>Choose Your Domain</h2>
+      <p>
+        Pick one of the three domains below. Each comes with a pre-curated document set and evaluation queries so you can focus on building, not on data collection.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Domain</th>
+            <th>Document Set</th>
+            <th>Example User Queries</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Legal Advisor</b></td>
+            <td>20 clauses from a standard employment agreement: termination, non-compete, leave policy, IP ownership, confidentiality, etc.</td>
+            <td>"Can I work for a competitor after leaving?" / "What happens to my code if I quit?" / "How many sick leaves do I get?"</td>
+          </tr>
+          <tr>
+            <td><b>Health FAQ Bot</b></td>
+            <td>25 entries from a clinic's patient guide: appointment booking, insurance coverage, vaccination schedules, emergency protocols, medication refills.</td>
+            <td>"How do I book an appointment with a dermatologist?" / "Is dental covered under the basic plan?" / "What vaccines does a 2-year-old need?"</td>
+          </tr>
+          <tr>
+            <td><b>University Course Guide</b></td>
+            <td>30 entries covering course descriptions, prerequisites, credit requirements, exam policies, grading rubrics, and faculty office hours.</td>
+            <td>"What are the prerequisites for Machine Learning?" / "How many credits do I need to graduate?" / "What's the late submission penalty?"</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        <i>Can I pick my own domain?</i> You can, but only if your document set has at least 20 entries and you can write 15 evaluation queries for it. Scoping a domain is harder than it looks — the pre-curated options save you hours.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="architecture">
+      <h2>Architecture Blueprint</h2>
+      <p>
+        Your capstone must follow this architecture. No shortcuts.
+      </p>
+
+      <div class="mermaid">
+graph TD
+    A[User Query] --> B[Embedding Model]
+    B -->|Convert to vector| C[(Vector DB)]
+    C -->|Retrieve chunks| D[Prompt Builder]
+    D -->|Context + Query| E[LLM API]
+    E --> F[Output + Citations + Cost]
+      </div>
+
+      <p>
+        Every component in this diagram corresponds to something you've built before. The challenge isn't learning new concepts — it's <b>integrating them cleanly</b> into a single, working system.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="requirements">
+      <h2>Required Components</h2>
+      <p>
+        Your capstone must include all of the following. Each one maps directly to a skill you built in a previous module.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Source Module</th>
+            <th>What's Required</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>System &amp; User Prompts</b></td>
+            <td>C1.2</td>
+            <td>Well-structured system prompt with role, constraints, and output format. User prompt template with context injection.</td>
+          </tr>
+          <tr>
+            <td><b>API Integration</b></td>
+            <td>C1.3</td>
+            <td>Reusable LLM wrapper class. Error handling for auth, rate limits, and timeouts. Token cost tracking on every call.</td>
+          </tr>
+          <tr>
+            <td><b>Vector Retrieval</b></td>
+            <td>C1.5</td>
+            <td>Documents chunked and embedded in ChromaDB. Retrieval function returning top-k chunks with source IDs. Grounding instruction in prompt.</td>
+          </tr>
+          <tr>
+            <td><b>Grounding Instruction</b></td>
+            <td>C1.5</td>
+            <td>"Answer ONLY from provided context" — and verified by testing with out-of-scope queries.</td>
+          </tr>
+          <tr>
+            <td><b>Evaluation Harness</b></td>
+            <td>C1.2</td>
+            <td>15-query test harness. At least 10 answerable, 5 out-of-scope. Accuracy score reported.</td>
+          </tr>
+          <tr>
+            <td><b>Prompt Iteration Log</b></td>
+            <td>C1.2</td>
+            <td>At least 2 documented prompt improvements with before/after accuracy scores.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Starter Code Skeleton</h3>
+      <pre><code>import os
+import json
+import chromadb
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
+
+class DomainAssistant:
+    def __init__(self, domain_name, documents):
+        self.llm = OpenAI()
+        self.chroma = chromadb.Client()
+        self.collection = self.chroma.create_collection(name=domain_name)
+        self.total_cost = 0.0
+
+        # Load documents
+        self.collection.add(
+            documents=documents,
+            ids=[f"doc_{i}" for i in range(len(documents))]
+        )
+        print(f"[{domain_name}] Loaded {len(documents)} documents.")
+
+    def retrieve(self, question, top_k=3):
+        results = self.collection.query(query_texts=[question], n_results=top_k)
+        return results["documents"][0], results["ids"][0]
+
+    def build_prompt(self, context_chunks, question):
+        context = "\n---\n".join(context_chunks)
+        return f"""Answer the question based ONLY on the context below.
+If the answer is not in the context, say "I don't have information about that."
+
+Context:
+{context}
+
+Question: {question}
+Answer:"""
+
+    def ask(self, question):
+        chunks, chunk_ids = self.retrieve(question)
+        prompt = self.build_prompt(chunks, question)
+
+        response = self.llm.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a domain expert assistant. Be concise and accurate. Cite the source when possible."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.0
+        )
+
+        answer = response.choices[0].message.content
+        input_tok = response.usage.prompt_tokens
+        output_tok = response.usage.completion_tokens
+        cost = (input_tok * 0.15 / 1_000_000) + (output_tok * 0.60 / 1_000_000)
+        self.total_cost += cost
+
+        return {
+            "answer": answer,
+            "sources": chunk_ids,
+            "cost": cost,
+            "input_tokens": input_tok,
+            "output_tokens": output_tok
+        }
+
+    def evaluate(self, test_cases):
+        correct = 0
+        print("\n--- Evaluation Run ---\n")
+        for i, case in enumerate(test_cases):
+            result = self.ask(case["question"])
+            is_decline = "don't have information" in result["answer"].lower()
+            passed = (case["has_answer"] and not is_decline) or (not case["has_answer"] and is_decline)
+            if passed:
+                correct += 1
+            status = "PASS" if passed else "FAIL"
+            print(f"  Q{i+1} [{status}]: {case['question'][:60]}...")
+            print(f"    A: {result['answer'][:80]}...")
+            print(f"    Sources: {result['sources']} | Cost: ${result['cost']:.6f}\n")
+
+        accuracy = correct / len(test_cases) * 100
+        print(f"--- Score: {correct}/{len(test_cases)} ({accuracy:.0f}%) ---")
+        print(f"--- Total Session Cost: ${self.total_cost:.6f} ---")
+        return accuracy</code></pre>
+
+      <h3>Example: Legal Domain Setup</h3>
+      <pre><code># --- Legal Domain Documents (sample — expand to 20+) ---
+legal_docs = [
+    "Employees may terminate employment by providing 30 days written notice to their immediate supervisor.",
+    "The non-compete clause restricts employees from joining a direct competitor for 12 months after leaving the company.",
+    "All intellectual property created during employment, including code, designs, and documentation, belongs to the company.",
+    "Employees are entitled to 12 days of paid sick leave per calendar year. Unused sick leave does not carry over.",
+    "Confidential information must not be disclosed during or after employment. Violation may result in legal action.",
+    "Probationary employees serve a 6-month period during which either party may terminate with 7 days notice.",
+    "Annual performance reviews are conducted in December. Salary revisions are effective from January 1st.",
+    "Remote work is permitted up to 3 days per week with manager approval. Full remote requires VP approval.",
+    "The company provides health insurance coverage for employees and their immediate family members.",
+    "Employees must complete mandatory compliance training within 30 days of joining.",
+    # ... add at least 10 more for your capstone
+]
+
+# --- Evaluation Queries (expand to 15) ---
+eval_queries = [
+    {"question": "How much notice do I need to give before quitting?", "has_answer": True},
+    {"question": "Can I join a competitor after I leave?", "has_answer": True},
+    {"question": "Who owns the code I write at work?", "has_answer": True},
+    {"question": "How many sick leaves do I get per year?", "has_answer": True},
+    {"question": "What's the salary for a senior engineer?", "has_answer": False},
+    {"question": "Does the company offer stock options?", "has_answer": False},
+    {"question": "Can I work remotely full time?", "has_answer": True},
+    # ... add 8 more
+]
+
+# --- Run ---
+assistant = DomainAssistant("legal_advisor", legal_docs)
+accuracy = assistant.evaluate(eval_queries)</code></pre>
+    </section>
+
+    <hr>
+
+    <section id="evaluation">
+      <h2>Evaluation &amp; Prompt Iteration</h2>
+      <p>
+        Running your evaluation harness once and calling it done is not enough. The capstone requires you to <b>iterate on your prompts</b> and <b>document the improvement</b>.
+      </p>
+
+      <p>
+        Here's what your Prompt Version Log should look like:
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Change Made</th>
+            <th>Accuracy</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>v1.0</td>
+            <td>Basic system prompt: "You are a helpful assistant"</td>
+            <td>60%</td>
+            <td>Hallucinated on out-of-scope queries. Gave verbose answers.</td>
+          </tr>
+          <tr>
+            <td>v1.1</td>
+            <td>Added grounding instruction: "Answer ONLY from context"</td>
+            <td>80%</td>
+            <td>Out-of-scope queries now declined. Some answers still too long.</td>
+          </tr>
+          <tr>
+            <td>v1.2</td>
+            <td>Added "Be concise. Max 2 sentences." + few-shot example in system prompt</td>
+            <td>93%</td>
+            <td>Clean, focused answers. One edge case with ambiguous query still fails.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        <i>Why does this matter?</i> Because in a real job, you'll need to prove that your AI system improved. You can't just say "I made it better" — you need the numbers. This log is your evidence.
+      </p>
+
+      <p>
+        The minimum requirement is <b>2 documented iterations</b> showing measurable improvement. More is better.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="demo-review">
+      <h2>Demo Review</h2>
+      <p>
+        You will present your capstone to a reviewer (your instructor, a peer, or an SME). Here's what the review covers:
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Review Area</th>
+            <th>What You Must Show</th>
+            <th>Pass Criteria</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Problem Statement</b></td>
+            <td>What domain you chose and why. What questions the assistant can answer.</td>
+            <td>Clear, scoped, and realistic.</td>
+          </tr>
+          <tr>
+            <td><b>Architecture</b></td>
+            <td>Walk through the RAG pipeline: documents → chunks → embeddings → retrieval → generation.</td>
+            <td>Can explain every component and why it's there.</td>
+          </tr>
+          <tr>
+            <td><b>Prompts</b></td>
+            <td>Show your system prompt and grounding instruction. Explain design decisions.</td>
+            <td>Prompt is well-structured, not a wall of text.</td>
+          </tr>
+          <tr>
+            <td><b>Retrieval Quality</b></td>
+            <td>Run 3 live queries. Show which chunks were retrieved and why they're relevant.</td>
+            <td>Relevant chunks are consistently in top-3.</td>
+          </tr>
+          <tr>
+            <td><b>Evaluation Report</b></td>
+            <td>15-query harness results. Prompt version log with at least 2 iterations.</td>
+            <td>Accuracy ≥ 80%. Documented improvement.</td>
+          </tr>
+          <tr>
+            <td><b>Code Quality</b></td>
+            <td>Clean, modular code. Reusable functions. Error handling.</td>
+            <td>Reviewer can read and understand the code.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        Treat this like a real engineering review. The reviewer will ask follow-up questions: <i>"Why did you choose this chunk size?"</i> or <i>"What happens if the user asks something completely unrelated?"</i> You should be able to answer confidently.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="portfolio">
+      <h2>Portfolio Deliverables</h2>
+      <p>
+        By the end of this capstone, your GitHub repository should contain:
+      </p>
+
+      <ol>
+        <li><b>README.md</b> — Problem statement, architecture diagram, setup instructions, how to run the assistant.</li>
+        <li><b>domain_assistant.py</b> — Main application code. Clean, modular, documented.</li>
+        <li><b>data/</b> — Your document corpus (text files or JSON).</li>
+        <li><b>evaluation/</b> — Test harness queries and results. Prompt version log.</li>
+        <li><b>requirements.txt</b> — Pinned dependencies.</li>
+        <li><b>.env.example</b> — Template for API keys (never commit actual keys!).</li>
+      </ol>
+
+      <pre><code>your-capstone-repo/
+├── README.md
+├── requirements.txt
+├── .env.example
+├── domain_assistant.py
+├── data/
+│   ├── legal_docs.json          # Your document corpus
+│   └── eval_queries.json        # 15 evaluation queries
+├── evaluation/
+│   ├── eval_results_v1.0.txt    # Results from each prompt version
+│   ├── eval_results_v1.2.txt
+│   └── prompt_version_log.md    # Documented prompt iterations
+└── prompts/
+    └── system_prompt.txt        # Your final system prompt</code></pre>
+
+      <p>
+        <i>This is your first AI portfolio piece.</i> When an interviewer asks "What have you built with AI?", you point to this repo. Make it clean, make it documented, make it real.
+      </p>
+
+      <p>
+        Congratulations — you've completed Track 1! You now have the engineering foundations to build, evaluate, and ship AI-powered applications. Track 2 takes you into production territory: scalable RAG, autonomous agents, orchestration frameworks, and real deployment.
+      </p>
+    </section>
+  </div>
+
+</body>
+</html>

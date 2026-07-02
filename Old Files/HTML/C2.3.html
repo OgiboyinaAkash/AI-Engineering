@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>C2.3: AI Agents, Tool Calling &amp; ReAct Pattern</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: monospace; padding: 12px; margin: 0; display: flex; gap: 24px; }
+    .toc { width: 220px; flex-shrink: 0; border-right: 1px solid #ccc; padding-right: 12px; }
+    .toc h3 { margin-top: 0; margin-bottom: 8px; }
+    .toc ul { list-style-type: none; padding-left: 0; margin-top: 0; margin-bottom: 20px; }
+    .toc li { margin-bottom: 8px; }
+    .main-content { flex-grow: 1; max-width: 80vw; }
+    code { display: block; background: #222; color: #eee; width: 80%; padding: 8px; overflow-x: auto; }
+    pre { background: #222; color: #eee; width: 80%; padding: 8px; margin: 0; overflow-x: auto; }
+    pre code { display: inline; background: none; color: inherit; padding: 0; width: auto; }
+    img { max-width: 80vw; }
+    hr { border: 0; border-top: 1px solid #ccc; margin: 24px 0; }
+    table { border-collapse: collapse; width: 80%; margin: 12px 0; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #eee; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+  </script>
+</head>
+<body>
+
+  <div class="toc">
+    <h3>Track 1</h3>
+    <ul>
+      <li><a href="C1.1.html">C1.1: Fundamentals &amp; APIs</a></li>
+      <li><a href="C1.2.html">C1.2: Prompt Engineering</a></li>
+      <li><a href="C1.3.html">C1.3: Building with APIs</a></li>
+      <li><a href="C1.4.html">C1.4: Tool Use &amp; Function Calling</a></li>
+      <li><a href="C1.5.html">C1.5: RAG &amp; Knowledge Grounding</a></li>
+      <li><a href="C1.6.html">C1.6: Capstone</a></li>
+    </ul>
+    <h3>Track 2</h3>
+    <ul>
+      <li><a href="C2.1.html">C2.1: Production RAG</a></li>
+      <li><a href="C2.2.html">C2.2: Vector DBs &amp; Hybrid Search</a></li>
+      <li><a href="C2.3.html"><b>C2.3: Agents &amp; ReAct</b></a></li>
+      <li><a href="C2.4.html">C2.4: Orchestration &amp; MCP</a></li>
+      <li><a href="C2.5.html">C2.5: Production APIs &amp; Security</a></li>
+      <li><a href="C2.6.html">C2.6: Capstone: Design Review</a></li>
+    </ul>
+
+    <h3>On This Page</h3>
+    <ul>
+      <li><a href="#what-is-agent">1. What Is an AI Agent?</a></li>
+      <li><a href="#react-pattern">2. The ReAct Pattern</a></li>
+      <li><a href="#multi-tool-agents">3. Multi-Tool Agents</a></li>
+      <li><a href="#error-recovery">4. Error Recovery</a></li>
+      <li><a href="#agent-safety">5. Agent Safety</a></li>
+      <li><a href="#lab">6. Lab: Multi-Tool Agent</a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <h1>AI Agents, Tool Calling &amp; ReAct Pattern</h1>
+
+    <p>
+      In C1.4, you taught an LLM to call functions — ask for the weather, calculate a tip, look up a contact. But those were <b>one-shot</b> tool calls: user asks, LLM picks a tool, your code runs it, LLM responds. Done.
+    </p>
+
+    <p>
+      Now imagine this: Ravi says to your assistant, <i>"Find the cheapest flight from Bangalore to Mumbai next Friday, check if my calendar is free that day, and if it is, book the flight and send me a confirmation email."</i>
+    </p>
+
+    <p>
+      That's not one tool call. That's <b>four</b> — and they depend on each other. You can't book the flight before checking the calendar. You can't send the email before booking. The assistant needs to <i>plan</i>, <i>act</i>, <i>observe the result</i>, and <i>decide what to do next</i> — in a loop.
+    </p>
+
+    <p>
+      That's an <b>AI agent</b>.
+    </p>
+
+    <hr>
+
+    <section id="what-is-agent">
+      <h2>What Is an AI Agent?</h2>
+
+      <p>
+        Let's be precise. There's a lot of hype around the word "agent," so let's nail down what it actually means in engineering terms:
+      </p>
+
+      <p>
+        An <b>AI agent</b> is a system where an LLM operates in a loop — it reasons about what to do, takes an action (calls a tool), observes the result, and decides the next step. This loop continues until the task is complete or a stopping condition is met.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Simple Tool Calling (C1.4)</th>
+            <th>AI Agent (This Module)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Number of steps</b></td>
+            <td>Fixed: 1 tool call, 1 response.</td>
+            <td>Variable: loops until task is done.</td>
+          </tr>
+          <tr>
+            <td><b>Decision making</b></td>
+            <td>LLM picks one tool per query.</td>
+            <td>LLM plans multi-step sequences, adapts based on intermediate results.</td>
+          </tr>
+          <tr>
+            <td><b>State</b></td>
+            <td>Stateless — each query is independent.</td>
+            <td>Stateful — accumulates context across steps.</td>
+          </tr>
+          <tr>
+            <td><b>Error handling</b></td>
+            <td>Your code catches errors.</td>
+            <td>The agent itself can retry, try alternative tools, or ask for clarification.</td>
+          </tr>
+          <tr>
+            <td><b>Risk</b></td>
+            <td>Low — one action, easy to review.</td>
+            <td>Higher — autonomous loops can go wrong.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        <i>Think of it like the difference between a vending machine and a personal assistant.</i> A vending machine does one thing when you press a button. A personal assistant takes a goal ("organize my trip"), breaks it into steps, handles surprises along the way, and comes back when it's done.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="react-pattern">
+      <h2>The ReAct Pattern: Reason + Act</h2>
+
+      <p>
+        The most widely used agent architecture is called <b>ReAct</b> — short for <b>Re</b>asoning + <b>Act</b>ing. The idea is simple: before each action, the LLM explicitly writes out its reasoning. This makes the agent's decision-making transparent and debuggable.
+      </p>
+
+      <p>The loop looks like this:</p>
+
+      <div class="mermaid">
+flowchart TD
+    A[Start] --> B[THINK: Reason about state]
+    B --> C{Action needed?}
+    C -- Yes --> D[ACT: Call Tool]
+    D --> E[OBSERVE: Get Result]
+    E --> B
+    C -- No --> F[FINISH: Return Final Answer]
+      </div>
+
+      <p>Let's see this concretely. Say the task is: <i>"What's the weather in Bangalore, and is it a good day for cricket?"</i></p>
+
+      <pre><code>Step 1 — THINK: "The user wants weather info for Bangalore and a recommendation.
+                  I need to first get the weather data."
+Step 1 — ACT:   get_weather(city="Bangalore")
+Step 1 — OBSERVE: {"temp": 28, "condition": "Partly Cloudy", "rain_chance": 15}
+
+Step 2 — THINK: "Got the weather. 28°C, partly cloudy, 15% rain chance.
+                  That's good cricket weather — low rain, not too hot."
+Step 2 — ACT:   FINISH (no more tools needed)
+Step 2 — RESPONSE: "Bangalore is 28°C with partly cloudy skies and only
+                     15% chance of rain — great day for cricket!"</code></pre>
+
+      <p>
+        <i>Notice how the LLM writes out its reasoning at each step?</i> This is what makes ReAct powerful for debugging. When the agent makes a wrong decision, you can read the reasoning and understand <i>why</i>.
+      </p>
+
+      <h3>Implementing ReAct in Code</h3>
+      <pre><code>import os
+import json
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
+client = OpenAI()
+
+# --- Tool definitions (same format as C1.4) ---
+def get_weather(city):
+    data = {"Bangalore": {"temp": 28, "condition": "Partly Cloudy", "rain_chance": 15},
+            "Mumbai": {"temp": 33, "condition": "Humid", "rain_chance": 70}}
+    return json.dumps(data.get(city, {"temp": 25, "condition": "Unknown", "rain_chance": 50}))
+
+def search_web(query):
+    # Mock web search
+    results = {"cricket schedule Bangalore": "IPL match at Chinnaswamy Stadium on Saturday at 7 PM.",
+               "restaurants near Chinnaswamy": "1. Vidyarthi Bhavan 2. MTR 3. Truffles"}
+    return json.dumps({"results": results.get(query, "No results found.")})
+
+tools = [
+    {"type": "function", "function": {
+        "name": "get_weather",
+        "description": "Get current weather for a city.",
+        "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}
+    }},
+    {"type": "function", "function": {
+        "name": "search_web",
+        "description": "Search the web for information.",
+        "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
+    }}
+]
+
+available_tools = {"get_weather": get_weather, "search_web": search_web}
+
+# --- The ReAct Agent Loop ---
+def run_agent(user_task, max_iterations=5):
+    messages = [
+        {"role": "system", "content": """You are a helpful assistant that completes tasks step-by-step.
+For each step, think about what you need to do next, then use a tool if needed.
+When the task is fully complete, respond with your final answer."""},
+        {"role": "user", "content": user_task}
+    ]
+
+    for iteration in range(max_iterations):
+        print(f"\n--- Iteration {iteration + 1} ---")
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            tools=tools,
+            temperature=0.0
+        )
+
+        message = response.choices[0].message
+
+        # Check if agent wants to call tools
+        if message.tool_calls:
+            messages.append(message)
+            for tool_call in message.tool_calls:
+                fn_name = tool_call.function.name
+                fn_args = json.loads(tool_call.function.arguments)
+                print(f"  ACTION: {fn_name}({json.dumps(fn_args)})")
+
+                result = available_tools[fn_name](**fn_args)
+                print(f"  OBSERVE: {result}")
+
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": result
+                })
+        else:
+            # No tool call — agent is done
+            print(f"  FINAL ANSWER: {message.content}")
+            return message.content
+
+    print("  [Agent hit max iterations — stopping.]")
+    return "Agent could not complete the task within the iteration limit."
+
+# --- Run it! ---
+run_agent("What's the weather in Bangalore and is there a cricket match this weekend?")</code></pre>
+
+      <p>Expected output:</p>
+      <pre><code>--- Iteration 1 ---
+  ACTION: get_weather({"city": "Bangalore"})
+  OBSERVE: {"temp": 28, "condition": "Partly Cloudy", "rain_chance": 15}
+
+--- Iteration 2 ---
+  ACTION: search_web({"query": "cricket schedule Bangalore"})
+  OBSERVE: {"results": "IPL match at Chinnaswamy Stadium on Saturday at 7 PM."}
+
+--- Iteration 3 ---
+  FINAL ANSWER: The weather in Bangalore is 28°C with partly cloudy skies and
+  a low 15% chance of rain. There's an IPL match at Chinnaswamy Stadium this
+  Saturday at 7 PM — great weather for it!</code></pre>
+
+      <p>
+        The agent made <b>three iterations</b>: two tool calls and one final answer. It figured out on its own that it needed two pieces of information, gathered them sequentially, and synthesized a response. That's the ReAct pattern in action.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="multi-tool-agents">
+      <h2>Multi-Tool Agents &amp; Planning</h2>
+      <p>
+        Real agents have access to many tools and need to <i>plan</i> which ones to use and in what order. The key insight is that you don't hard-code the plan — the LLM figures it out based on the task and available tools.
+      </p>
+
+      <p>
+        Consider a research assistant agent with these tools:
+      </p>
+      <ul>
+        <li><code>search_docs(query)</code> — search internal documents</li>
+        <li><code>search_web(query)</code> — search the internet</li>
+        <li><code>summarize(text)</code> — summarize long text</li>
+        <li><code>save_note(title, content)</code> — save a research note</li>
+      </ul>
+
+      <p>
+        If Priya asks: <i>"Research our company's Q3 revenue and compare it to the industry average. Save a summary."</i>
+      </p>
+
+      <p>The agent might plan:</p>
+      <ol>
+        <li>Search internal docs for "Q3 revenue" → gets the company number</li>
+        <li>Search the web for "industry average revenue Q3 2026" → gets the benchmark</li>
+        <li>Summarize both findings into a comparison</li>
+        <li>Save the summary as a research note</li>
+      </ol>
+
+      <p>
+        <i>The LLM decided this plan on its own.</i> You just gave it tools and a goal. This is what makes agents powerful — and dangerous, which is why the safety section below is critical.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="error-recovery">
+      <h2>Error Recovery — When Tools Fail</h2>
+
+      <p>
+        In production, tools fail. APIs time out. Databases return errors. Search results come back empty. A robust agent doesn't crash when a tool fails — it <b>adapts</b>.
+      </p>
+
+      <pre><code>def run_agent_with_recovery(user_task, max_iterations=7):
+    messages = [
+        {"role": "system", "content": """You are a helpful assistant. Use tools to complete tasks.
+If a tool returns an error or empty result:
+1. Try rephrasing the query and calling the tool again.
+2. If it fails twice, try an alternative tool.
+3. If no tool can help, tell the user what you tried and what failed.
+Never make up information to compensate for a failed tool call."""},
+        {"role": "user", "content": user_task}
+    ]
+
+    for iteration in range(max_iterations):
+        response = client.chat.completions.create(
+            model="gpt-4o-mini", messages=messages, tools=tools, temperature=0.0
+        )
+        message = response.choices[0].message
+
+        if message.tool_calls:
+            messages.append(message)
+            for tool_call in message.tool_calls:
+                fn_name = tool_call.function.name
+                fn_args = json.loads(tool_call.function.arguments)
+
+                try:
+                    result = available_tools[fn_name](**fn_args)
+                except Exception as e:
+                    # Return error to the agent — let IT decide what to do
+                    result = json.dumps({"error": str(e), "tool": fn_name, "args": fn_args})
+                    print(f"  [Tool Error: {fn_name} failed — {e}]")
+
+                messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
+        else:
+            return message.content
+
+    return "Agent exceeded maximum iterations."</code></pre>
+
+      <p>
+        The key pattern here: <b>don't hide errors from the agent</b>. When a tool fails, return the error message as the tool result. The LLM is surprisingly good at reading error messages and adjusting its approach — rephrasing a search query, trying a different tool, or explaining to the user what went wrong.
+      </p>
+
+      <p>
+        <i>What you should never do:</i> silently return fake data when a tool fails. That's how hallucinations get into agent outputs. Always surface the failure.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="agent-safety">
+      <h2>Agent Safety — This Is Not Optional</h2>
+
+      <p>
+        Here's the uncomfortable truth: an agent is an LLM running in a loop, autonomously deciding what actions to take. If you don't put guardrails on it, things <i>will</i> go wrong. Not "might." <b>Will.</b>
+      </p>
+
+      <p>
+        Real-world agent failures:
+      </p>
+      <ul>
+        <li><b>Infinite loops:</b> Agent keeps calling the same tool with the same arguments because it doesn't understand the result. Your API bill skyrockets.</li>
+        <li><b>Unauthorized actions:</b> Agent decides to "help" by deleting old records or sending emails to contacts without approval.</li>
+        <li><b>Data leakage:</b> Agent sends internal company data to an external search API.</li>
+      </ul>
+
+      <h3>Mandatory Safety Measures</h3>
+      <p>Every agent you build in this course must have all four:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Safety Measure</th>
+            <th>Implementation</th>
+            <th>Why It Matters</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Loop Limit</b></td>
+            <td><code>max_iterations</code> parameter. Hard stop at 5–10.</td>
+            <td>Prevents infinite loops and runaway API costs.</td>
+          </tr>
+          <tr>
+            <td><b>Permission Boundaries</b></td>
+            <td>Whitelist of allowed tools. Agent cannot access tools outside the list.</td>
+            <td>Prevents unauthorized actions (deleting data, sending emails).</td>
+          </tr>
+          <tr>
+            <td><b>Approval Steps</b></td>
+            <td>For high-stakes actions (payments, deletions), require human confirmation before execution.</td>
+            <td>Human-in-the-loop for irreversible actions.</td>
+          </tr>
+          <tr>
+            <td><b>Decision Logging</b></td>
+            <td>Log every reasoning step, tool call, and result to a file.</td>
+            <td>Audit trail. Debug failures. Catch anomalies.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Decision Logging Implementation</h3>
+      <pre><code>import datetime
+
+class AgentLogger:
+    def __init__(self, log_file="agent_decisions.jsonl"):
+        self.log_file = log_file
+
+    def log(self, iteration, event_type, data):
+        entry = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "iteration": iteration,
+            "type": event_type,  # "think", "action", "observation", "error", "final"
+            "data": data
+        }
+        with open(self.log_file, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+        print(f"  [{event_type.upper()}] {json.dumps(data)[:100]}...")
+
+# Usage in agent loop:
+logger = AgentLogger()
+# logger.log(1, "action", {"tool": "get_weather", "args": {"city": "Bangalore"}})
+# logger.log(1, "observation", {"result": {"temp": 28, "condition": "Partly Cloudy"}})
+# logger.log(2, "final", {"answer": "The weather is 28°C..."})</code></pre>
+
+      <h3>Human Approval for High-Stakes Actions</h3>
+      <pre><code>HIGH_RISK_TOOLS = {"send_email", "delete_record", "make_payment"}
+
+def execute_tool(fn_name, fn_args):
+    if fn_name in HIGH_RISK_TOOLS:
+        print(f"\n⚠️  HIGH-RISK ACTION: {fn_name}({json.dumps(fn_args)})")
+        approval = input("  Approve? (yes/no): ").strip().lower()
+        if approval != "yes":
+            return json.dumps({"error": "Action blocked by user", "tool": fn_name})
+
+    return available_tools[fn_name](**fn_args)</code></pre>
+
+      <p>
+        <i>This is the single most important thing in this module.</i> A clever agent with no safety boundaries is a liability, not a feature. Every agent in your capstone must have loop limits, permission boundaries, and decision logging. No exceptions.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="lab">
+      <h2>Lab: Build a Multi-Tool Research Agent</h2>
+
+      <h3>1. Problem Setup</h3>
+      <p>
+        Build a research assistant agent that can: search internal documents, search the web, summarize text, and save research notes. The agent must complete bounded research tasks using the ReAct pattern, handle tool failures gracefully, and log every decision.
+      </p>
+
+      <h3>2. Environment Setup</h3>
+      <pre><code>pip install openai python-dotenv</code></pre>
+
+      <h3>3. Step-by-Step Instructions</h3>
+      <ol>
+        <li>Define 4 tools: <code>search_docs</code>, <code>search_web</code>, <code>summarize</code>, <code>save_note</code>. Use mock implementations.</li>
+        <li>Implement the ReAct agent loop with <code>max_iterations=7</code>.</li>
+        <li>Add error recovery — make <code>search_web</code> fail 50% of the time randomly to simulate API instability.</li>
+        <li>Implement decision logging to a JSONL file.</li>
+        <li>Add <code>save_note</code> to the high-risk tool list requiring user approval.</li>
+        <li>Test with the task: "Research CloudNest's pricing plans, find industry competitor pricing, and save a comparison note."</li>
+      </ol>
+
+      <h3>4. Starter Code</h3>
+      <pre><code>import os
+import json
+import random
+import datetime
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
+client = OpenAI()
+
+# --- Mock Tools ---
+def search_docs(query):
+    docs_db = {
+        "pricing": "CloudNest Starter: ₹499/mo, Pro: ₹1499/mo, Enterprise: ₹4999/mo.",
+        "refund": "30-day refund for Pro, 90-day for Enterprise.",
+        "support": "24/7 support for Pro and Enterprise plans.",
+    }
+    for key, val in docs_db.items():
+        if key in query.lower():
+            return json.dumps({"source": "internal_docs", "result": val})
+    return json.dumps({"source": "internal_docs", "result": "No relevant documents found."})
+
+def search_web(query):
+    # Simulate 30% failure rate
+    if random.random() < 0.3:
+        raise ConnectionError("Web search API timed out")
+    results = {
+        "cloud hosting pricing": "AWS Lightsail: $5-80/mo, DigitalOcean: $4-96/mo, Linode: $5-96/mo",
+        "competitor analysis hosting": "Major competitors offer tiered pricing from $5-100/month.",
+    }
+    for key, val in results.items():
+        if any(word in query.lower() for word in key.split()):
+            return json.dumps({"source": "web", "result": val})
+    return json.dumps({"source": "web", "result": "No results found."})
+
+def summarize(text):
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": f"Summarize in 2 sentences:\n{text}"}],
+        temperature=0.0
+    )
+    return json.dumps({"summary": response.choices[0].message.content})
+
+saved_notes = []
+def save_note(title, content):
+    saved_notes.append({"title": title, "content": content, "saved_at": datetime.datetime.now().isoformat()})
+    return json.dumps({"status": "saved", "title": title})
+
+# --- Tool Definitions ---
+tools = [
+    {"type": "function", "function": {
+        "name": "search_docs", "description": "Search internal company documents.",
+        "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
+    }},
+    {"type": "function", "function": {
+        "name": "search_web", "description": "Search the internet for external information.",
+        "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
+    }},
+    {"type": "function", "function": {
+        "name": "summarize", "description": "Summarize a long piece of text into a brief summary.",
+        "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}
+    }},
+    {"type": "function", "function": {
+        "name": "save_note", "description": "Save a research note with a title and content.",
+        "parameters": {"type": "object", "properties": {
+            "title": {"type": "string"}, "content": {"type": "string"}
+        }, "required": ["title", "content"]}
+    }}
+]
+
+available_tools = {
+    "search_docs": search_docs, "search_web": search_web,
+    "summarize": summarize, "save_note": save_note
+}
+
+HIGH_RISK = {"save_note"}
+
+# --- Logger ---
+class AgentLogger:
+    def __init__(self):
+        self.log = []
+
+    def record(self, iteration, event_type, data):
+        entry = {"iter": iteration, "type": event_type, "data": data,
+                 "time": datetime.datetime.now().isoformat()}
+        self.log.append(entry)
+        print(f"  [{event_type.upper()}] {str(data)[:120]}")
+
+# --- ReAct Agent ---
+def run_research_agent(task, max_iterations=7):
+    logger = AgentLogger()
+    messages = [
+        {"role": "system", "content": """You are a research assistant. Complete the task step by step.
+Think about what information you need, use tools to gather it, and synthesize a result.
+If a tool fails, try rephrasing or use an alternative. Never fabricate information."""},
+        {"role": "user", "content": task}
+    ]
+
+    for i in range(max_iterations):
+        print(f"\n--- Step {i+1}/{max_iterations} ---")
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini", messages=messages, tools=tools, temperature=0.0
+        )
+        msg = response.choices[0].message
+
+        if msg.tool_calls:
+            messages.append(msg)
+            for tc in msg.tool_calls:
+                fn_name = tc.function.name
+                fn_args = json.loads(tc.function.arguments)
+                logger.record(i+1, "action", {"tool": fn_name, "args": fn_args})
+
+                # Human approval for high-risk tools
+                if fn_name in HIGH_RISK:
+                    print(f"\n  ⚠️  Approval needed for: {fn_name}({json.dumps(fn_args)[:80]})")
+                    approval = input("  Approve? (yes/no): ").strip().lower()
+                    if approval != "yes":
+                        result = json.dumps({"error": "Blocked by user"})
+                        logger.record(i+1, "blocked", {"tool": fn_name})
+                        messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+                        continue
+
+                try:
+                    result = available_tools[fn_name](**fn_args)
+                    logger.record(i+1, "observation", {"result": result[:200]})
+                except Exception as e:
+                    result = json.dumps({"error": str(e)})
+                    logger.record(i+1, "error", {"tool": fn_name, "error": str(e)})
+
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+        else:
+            logger.record(i+1, "final", {"answer": msg.content[:200]})
+            print(f"\n  FINAL: {msg.content}")
+            return msg.content, logger.log
+
+    return "Max iterations reached.", logger.log
+
+# --- Run ---
+if __name__ == "__main__":
+    answer, log = run_research_agent(
+        "Research CloudNest's pricing, find competitor pricing on the web, and save a comparison note."
+    )
+    print(f"\n--- Agent Decision Log ({len(log)} entries) ---")
+    for entry in log:
+        print(f"  Step {entry['iter']}: {entry['type']}")</code></pre>
+
+      <h3>5. Expected Output Sample</h3>
+      <pre><code>--- Step 1/7 ---
+  [ACTION] {"tool": "search_docs", "args": {"query": "pricing"}}
+  [OBSERVATION] {"source": "internal_docs", "result": "CloudNest Starter: ₹499/mo..."}
+
+--- Step 2/7 ---
+  [ACTION] {"tool": "search_web", "args": {"query": "cloud hosting pricing comparison"}}
+  [OBSERVATION] {"source": "web", "result": "AWS Lightsail: $5-80/mo..."}
+
+--- Step 3/7 ---
+  [ACTION] {"tool": "save_note", "args": {"title": "Pricing Comparison", "content": "..."}}
+
+  ⚠️  Approval needed for: save_note({"title": "Pricing Comparison"...})
+  Approve? (yes/no): yes
+  [OBSERVATION] {"status": "saved", "title": "Pricing Comparison"}
+
+--- Step 4/7 ---
+  [FINAL] {"answer": "I've completed the research. CloudNest's pricing..."}
+
+  FINAL: I've completed the research. CloudNest's pricing ranges from ₹499
+  to ₹4999/month across three tiers. Compared to AWS Lightsail ($5-80/mo)
+  and DigitalOcean ($4-96/mo), CloudNest is competitively positioned...
+
+--- Agent Decision Log (4 entries) ---
+  Step 1: action
+  Step 1: observation
+  Step 2: action
+  Step 3: action</code></pre>
+
+      <h3>6. Failure Scenario</h3>
+      <p>
+        Remove the <code>max_iterations</code> limit (set it to 100). Give the agent an impossible task: <i>"Find the exact revenue of CloudNest for Q3 2026."</i> Watch it loop endlessly — searching docs, searching the web, retrying, rephrasing — burning API calls. This demonstrates why loop limits are mandatory, not optional.
+      </p>
+
+      <h3>7. Extension Challenge (Optional)</h3>
+      <p>
+        Add a <code>send_email</code> tool (mock implementation that prints to console). Make it high-risk. Give the agent a task: <i>"Research our pricing, draft a comparison report, and email it to ravi@cloudnest.com."</i> Verify that the agent asks for human approval before "sending" the email.
+      </p>
+
+      <h3>8. Reflection Prompts</h3>
+      <ol>
+        <li>What is the difference between a chain (fixed sequence of steps) and an agent (dynamic planning)? When would you choose one over the other?</li>
+        <li>An agent went into an infinite loop in production, making 200 API calls in 3 minutes. Walk through how you would prevent this and how you would detect it after the fact.</li>
+      </ol>
+    </section>
+  </div>
+
+</body>
+</html>

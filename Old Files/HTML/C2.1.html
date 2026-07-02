@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>C2.1: Production RAG Architecture</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: monospace;
+      padding: 12px;
+      margin: 0;
+      display: flex;
+      gap: 24px;
+    }
+
+    .toc {
+      width: 220px;
+      flex-shrink: 0;
+      border-right: 1px solid #ccc;
+      padding-right: 12px;
+    }
+
+    .toc h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    .toc ul {
+      list-style-type: none;
+      padding-left: 0;
+      margin-top: 0;
+      margin-bottom: 20px;
+    }
+
+    .toc li {
+      margin-bottom: 8px;
+    }
+
+    .main-content {
+      flex-grow: 1;
+      max-width: 80vw;
+    }
+
+    code {
+      display: block;
+      background: #222;
+      color: #eee;
+      width: 80%;
+      padding: 8px;
+      overflow-x: auto;
+    }
+
+    pre {
+      background: #222;
+      color: #eee;
+      width: 80%;
+      padding: 8px;
+      margin: 0;
+      overflow-x: auto;
+    }
+
+    pre code {
+      display: inline;
+      background: none;
+      color: inherit;
+      padding: 0;
+      width: auto;
+    }
+
+    img {
+      max-width: 80vw;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid #ccc;
+      margin: 24px 0;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 80%;
+      margin: 12px 0;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #eee;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Left Sidebar Table of Contents -->
+  <div class="toc">
+    <h3>Track 1</h3>
+    <ul>
+      <li><a href="C1.1.html">C1.1: Fundamentals &amp; APIs</a></li>
+      <li><a href="C1.2.html">C1.2: Prompt Engineering</a></li>
+      <li><a href="C1.3.html">C1.3: Building with APIs</a></li>
+      <li><a href="C1.4.html">C1.4: Tool Use &amp; Function Calling</a></li>
+      <li><a href="C1.5.html">C1.5: RAG &amp; Knowledge Grounding</a></li>
+      <li><a href="C1.6.html">C1.6: Capstone</a></li>
+    </ul>
+    <h3>Track 2</h3>
+    <ul>
+      <li><a href="C2.1.html"><b>C2.1: Production RAG</b></a></li>
+      <li><a href="C2.2.html">C2.2: Vector DBs &amp; Hybrid Search</a></li>
+      <li><a href="C2.3.html">C2.3: Agents &amp; ReAct</a></li>
+      <li><a href="C2.4.html">C2.4: Orchestration &amp; MCP</a></li>
+      <li><a href="C2.5.html">C2.5: Production APIs &amp; Security</a></li>
+      <li><a href="C2.6.html">C2.6: Capstone: Design Review</a></li>
+    </ul>
+
+    <h3>On This Page</h3>
+    <ul>
+      <li><a href="#rag-vs-finetuning">1. RAG vs Fine-Tuning</a></li>
+      <li><a href="#chunking-strategies">2. Chunking Strategies</a></li>
+      <li><a href="#embedding-models">3. Embedding Model Selection</a></li>
+      <li><a href="#query-rewriting">4. Query Rewriting</a></li>
+      <li><a href="#lab">5. Lab: Production RAG Pipeline</a></li>
+    </ul>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="main-content">
+    <h1>Production RAG Architecture</h1>
+
+    <p>
+      Welcome to Track 2. If Track 1 was about learning to cook individual dishes — making an omelette (API calls), baking bread (prompts), preparing a salad (RAG) — then Track 2 is about running a restaurant kitchen. Same ingredients, completely different game.
+    </p>
+
+    <p>
+      In C1.5, you built a mini-RAG pipeline with 10-12 hardcoded policy strings. It worked beautifully in the lab. But try scaling that to 500 real documents — messy PDFs, overlapping topics, inconsistent formatting — and things fall apart fast. <i>Which chunks does the retriever miss? Why does the LLM hallucinate on question 47 but nail question 48? Why is the answer weirdly cut off?</i>
+    </p>
+
+    <p>
+      This module is about building RAG that actually works <b>in production</b>.
+    </p>
+
+    <hr>
+
+    <section id="rag-vs-finetuning">
+      <h2>RAG vs Fine-Tuning: When to Use What</h2>
+      <p>
+        Before we go deeper into RAG, let's address the elephant in the room: <i>"Why not just fine-tune the model on our company's data?"</i>
+      </p>
+
+      <p>
+        Fine-tuning means taking a pre-trained LLM and training it further on your own data so it "knows" your content natively. It sounds great in theory. In practice, here's why RAG wins for most product teams:
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Factor</th>
+            <th>RAG</th>
+            <th>Fine-Tuning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Data freshness</b></td>
+            <td>Update documents anytime — retrieval sees changes instantly.</td>
+            <td>Must retrain the model every time data changes. Expensive.</td>
+          </tr>
+          <tr>
+            <td><b>Cost</b></td>
+            <td>Embedding costs are tiny. Generation costs are the same.</td>
+            <td>Training runs cost $100–$10,000+ depending on model size.</td>
+          </tr>
+          <tr>
+            <td><b>Hallucination control</b></td>
+            <td>Grounding instruction + source citations. Controllable.</td>
+            <td>Model may still hallucinate — you can't easily verify what it "learned".</td>
+          </tr>
+          <tr>
+            <td><b>Infrastructure</b></td>
+            <td>A vector DB + API calls. Any engineer can set it up.</td>
+            <td>GPU clusters, training pipelines, ML ops. Needs a specialized team.</td>
+          </tr>
+          <tr>
+            <td><b>Best for</b></td>
+            <td>Knowledge Q&amp;A, document search, customer support, internal tools.</td>
+            <td>Changing the model's tone, style, or behaviour. Domain-specific jargon.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        <b>Bottom line:</b> For this program, and for the vast majority of product teams, RAG is the answer. Fine-tuning is a specialised tool for specific problems. When your team has no training infrastructure, no ML engineers, and data that changes weekly — RAG is not just easier, it's <i>better</i>.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="chunking-strategies">
+      <h2>Chunking Strategies — The Make-or-Break Decision</h2>
+      <p>
+        In C1.5, we mentioned that chunk size matters. Now let's get serious about it. In production RAG, chunking is often the single biggest lever for retrieval quality. Get it wrong, and your retrieval will feed the LLM irrelevant garbage no matter how good your embeddings are.
+      </p>
+
+      <h3>Strategy 1: Fixed-Size Chunking</h3>
+      <p>
+        The simplest approach — split text every N characters or tokens. Fast to implement, but blind to meaning boundaries.
+      </p>
+      <pre><code>def fixed_size_chunk(text, chunk_size=500, overlap=50):
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + chunk_size, len(text))
+        chunks.append(text[start:end])
+        start = end - overlap
+    return chunks</code></pre>
+
+      <p><b>Problem:</b> This might split "The refund window is" into one chunk and "60 days for premium members" into the next. The retriever finds the second chunk but it lacks context about <i>what</i> has a 60-day window.</p>
+
+      <h3>Strategy 2: Sentence-Aware Chunking</h3>
+      <p>
+        Split on sentence boundaries so each chunk contains complete thoughts.
+      </p>
+      <pre><code>import re
+
+def sentence_chunk(text, max_sentences=5, overlap_sentences=1):
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    chunks = []
+    for i in range(0, len(sentences), max_sentences - overlap_sentences):
+        chunk = " ".join(sentences[i:i + max_sentences])
+        if chunk.strip():
+            chunks.append(chunk)
+    return chunks</code></pre>
+
+      <p>Better! Each chunk is at least a complete thought. But sentences vary wildly in length — you might get chunks of 20 tokens or 500 tokens.</p>
+
+      <h3>Strategy 3: Semantic Chunking</h3>
+      <p>
+        The most sophisticated approach: use embeddings to detect where the <i>meaning</i> shifts in the text, and split at those boundaries.
+      </p>
+      <pre><code>from openai import OpenAI
+import numpy as np
+
+client = OpenAI()
+
+def get_embedding(text):
+    response = client.embeddings.create(model="text-embedding-3-small", input=text)
+    return response.data[0].embedding
+
+def semantic_chunk(sentences, similarity_threshold=0.8):
+    chunks = []
+    current_chunk = [sentences[0]]
+
+    for i in range(1, len(sentences)):
+        emb_prev = np.array(get_embedding(sentences[i - 1]))
+        emb_curr = np.array(get_embedding(sentences[i]))
+        similarity = np.dot(emb_prev, emb_curr) / (np.linalg.norm(emb_prev) * np.linalg.norm(emb_curr))
+
+        if similarity >= similarity_threshold:
+            current_chunk.append(sentences[i])
+        else:
+            chunks.append(" ".join(current_chunk))
+            current_chunk = [sentences[i]]
+
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))
+    return chunks</code></pre>
+
+      <p>
+        <i>This is expensive</i> — you're making an embedding API call for every sentence. But for high-value corpora (legal contracts, medical records), the quality improvement is worth it.
+      </p>
+
+      <h3>Comparison Summary</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Strategy</th>
+            <th>Speed</th>
+            <th>Quality</th>
+            <th>Cost</th>
+            <th>Best For</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Fixed-size</td>
+            <td>Very fast</td>
+            <td>Okay</td>
+            <td>Free</td>
+            <td>Quick prototypes, uniform text</td>
+          </tr>
+          <tr>
+            <td>Sentence-aware</td>
+            <td>Fast</td>
+            <td>Good</td>
+            <td>Free</td>
+            <td>General documents, articles</td>
+          </tr>
+          <tr>
+            <td>Semantic</td>
+            <td>Slow</td>
+            <td>Excellent</td>
+            <td>Embedding API calls</td>
+            <td>High-value, complex documents</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr>
+
+    <section id="embedding-models">
+      <h2>Embedding Model Selection</h2>
+      <p>
+        Not all embedding models are created equal. The model you choose affects retrieval quality, speed, cost, and vector size (which affects storage).
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Provider</th>
+            <th>Dimensions</th>
+            <th>Cost (per 1M tokens)</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>text-embedding-3-small</td>
+            <td>OpenAI</td>
+            <td>1536</td>
+            <td>$0.02</td>
+            <td>Great balance of cost and quality. Default choice.</td>
+          </tr>
+          <tr>
+            <td>text-embedding-3-large</td>
+            <td>OpenAI</td>
+            <td>3072</td>
+            <td>$0.13</td>
+            <td>Higher quality, 2x the storage.</td>
+          </tr>
+          <tr>
+            <td>embed-english-v3.0</td>
+            <td>Cohere</td>
+            <td>1024</td>
+            <td>$0.10</td>
+            <td>Strong for English. Supports search/classify types.</td>
+          </tr>
+          <tr>
+            <td>all-MiniLM-L6-v2</td>
+            <td>Open Source (HF)</td>
+            <td>384</td>
+            <td>Free (local)</td>
+            <td>Fast, tiny, runs locally. Good for prototypes.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        <b>Important rule:</b> You must embed your documents and your queries with the <b>same model</b>. If you embed documents with <code>text-embedding-3-small</code> and query with <code>all-MiniLM-L6-v2</code>, the vectors live in completely different spaces and similarity search will return garbage.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="query-rewriting">
+      <h2>Query Rewriting — Making Retrieval Smarter</h2>
+      <p>
+        Here's a problem you'll hit in production: users ask terrible questions. Not terrible as in rude — terrible as in vague, incomplete, or phrased nothing like the documents.
+      </p>
+
+      <p>
+        Vikram types: <i>"refund?"</i>
+      </p>
+
+      <p>
+        That single word gets embedded and compared against your chunks. But "refund?" as a vector is much less specific than "What is the refund policy for premium members?" — so the retriever returns weakly relevant chunks, and the LLM gives a mediocre answer.
+      </p>
+
+      <p>
+        <b>Query rewriting</b> uses the LLM to expand or rephrase the user's question into a better search query before retrieval:
+      </p>
+
+      <pre><code>def rewrite_query(user_question):
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a search query optimizer. Rewrite the user's question into a clear, specific search query that would match relevant document chunks. Output ONLY the rewritten query, nothing else."},
+            {"role": "user", "content": user_question}
+        ],
+        temperature=0.0
+    )
+    return response.choices[0].message.content
+
+# Example:
+original = "refund?"
+rewritten = rewrite_query(original)
+print(f"Original: {original}")
+print(f"Rewritten: {rewritten}")
+# Output: "What is the refund policy and how do I request a refund?"</code></pre>
+
+      <p>
+        <i>Wait — we're using the LLM just to improve the search query?</i> Yes! This adds one extra API call (cheap with a mini model), but the retrieval quality improvement is dramatic. The rewritten query produces much better embedding vectors, which pull out far more relevant chunks.
+      </p>
+
+      <p>
+        The trade-off is latency and cost. In practice, query rewriting adds ~200-500ms and a few cents per 1000 queries. For most production systems, that's a great trade.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="lab">
+      <h2>Lab: Production RAG Pipeline</h2>
+
+      <h3>1. Problem Setup</h3>
+      <p>
+        You are building a production RAG pipeline for an internal knowledge base with 50+ documents. You must implement multiple chunking strategies, compare their retrieval quality, add query rewriting, and measure the difference quantitatively.
+      </p>
+
+      <h3>2. Environment Setup</h3>
+      <pre><code>pip install openai chromadb python-dotenv numpy</code></pre>
+
+      <h3>3. Step-by-Step Instructions</h3>
+      <ol>
+        <li>Create a document corpus of at least 50 entries (provided below as starter data).</li>
+        <li>Implement two chunking strategies: fixed-size and sentence-aware.</li>
+        <li>Build two separate ChromaDB collections — one per chunking strategy.</li>
+        <li>Create a set of 10 test queries with expected relevant document IDs.</li>
+        <li>Run each query against both collections and compare which strategy retrieves the correct chunks more often.</li>
+        <li>Add query rewriting and measure the improvement on the weaker strategy.</li>
+      </ol>
+
+      <h3>4. Starter Code</h3>
+      <pre><code>import os
+import re
+import json
+import chromadb
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
+client = OpenAI()
+
+# --- 50-Document Corpus (CloudNest Hosting Knowledge Base) ---
+corpus = [
+    "CloudNest Starter plan costs ₹499/month and includes 1 vCPU, 1 GB RAM, and 20 GB SSD.",
+    "CloudNest Pro plan costs ₹1,499/month with 2 vCPUs, 4 GB RAM, and 80 GB SSD.",
+    "CloudNest Enterprise plan costs ₹4,999/month with dedicated resources and account manager.",
+    "All plans include free SSL certificates and basic DDoS protection.",
+    "Premium DDoS protection is available as an add-on for ₹299/month.",
+    "Starter plan customers get email support during business hours (9 AM - 6 PM IST).",
+    "Pro plan customers get 24/7 email and chat support.",
+    "Enterprise customers get 24/7 priority support with a dedicated Slack channel.",
+    "All refund requests must include the original order ID and registered email.",
+    "Starter plan refunds are available within 14 days of purchase.",
+    "Pro plan refunds are available within 30 days of purchase.",
+    "Enterprise plan refunds are available within 90 days with prorated option up to 6 months.",
+    "Server uptime SLA guarantees 99.9% availability for Pro and Enterprise plans.",
+    "Starter plan does not include an uptime SLA guarantee.",
+    "Scheduled maintenance is announced 48 hours in advance via email notification.",
+    "Emergency maintenance may occur without notice but is logged in the status page.",
+    "Data backups are automatic, performed daily, and retained for 30 days.",
+    "Enterprise customers can request custom backup retention periods up to 1 year.",
+    "Data centers are located in Mumbai, Bangalore, and Singapore.",
+    "EU customers can request data residency in the Singapore data center.",
+    "CloudNest supports Linux (Ubuntu, CentOS, Debian) and Windows Server.",
+    "One-click app deployment is available for WordPress, Node.js, Django, and Laravel.",
+    "Custom Docker container deployment is supported on Pro and Enterprise plans.",
+    "SSH access is available on all plans. Root access requires Pro or Enterprise.",
+    "Managed database add-ons: MySQL (₹199/mo), PostgreSQL (₹249/mo), MongoDB (₹299/mo).",
+    "Free managed database is included with Enterprise plan (PostgreSQL or MySQL).",
+    "Domain registration costs ₹799/year for .com and ₹499/year for .in domains.",
+    "Free domain is included with annual Pro and Enterprise subscriptions.",
+    "DNS management is available through the CloudNest dashboard.",
+    "Wildcard SSL certificates are available for ₹999/year.",
+    "Two-factor authentication (2FA) is mandatory for all dashboard logins.",
+    "API access is available for automated server management on Pro and Enterprise.",
+    "Rate limits: Starter gets 100 API calls/hour, Pro gets 1000, Enterprise gets unlimited.",
+    "CloudNest CLI tool is available for Mac, Linux, and Windows.",
+    "Server monitoring dashboard shows CPU, RAM, disk usage, and network traffic.",
+    "Alert notifications can be configured for CPU > 80%, disk > 90%, or downtime.",
+    "Log access is available via the dashboard or SSH for the last 30 days.",
+    "Enterprise customers get centralized log aggregation with Elasticsearch integration.",
+    "Load balancer add-on costs ₹599/month and supports HTTP and TCP balancing.",
+    "Auto-scaling is available on Enterprise plan with configurable triggers.",
+    "IPv6 support is available on all plans at no extra cost.",
+    "CDN integration is available through Cloudflare partnership at ₹199/month.",
+    "Bandwidth: Starter gets 1 TB/month, Pro gets 5 TB/month, Enterprise gets unlimited.",
+    "Overage bandwidth is charged at ₹5 per additional GB.",
+    "Account deletion can be requested by emailing privacy@cloudnest.com.",
+    "Data is permanently deleted within 30 days of account deletion request.",
+    "CloudNest does not share customer data with third parties.",
+    "Compliance: CloudNest is SOC 2 Type II certified.",
+    "GDPR data processing agreement is available for EU customers on request.",
+    "Partner program offers 20% recurring commission on referrals.",
+]
+
+# --- Chunking Implementations ---
+def fixed_chunks(docs, chunk_size=2):
+    """Group every chunk_size documents together"""
+    chunks = []
+    for i in range(0, len(docs), chunk_size):
+        chunk = " ".join(docs[i:i+chunk_size])
+        chunks.append(chunk)
+    return chunks
+
+def sentence_chunks(docs, overlap=1):
+    """Each document is its own chunk (already sentence-level)"""
+    return docs  # Already sentence-level in our corpus
+
+# --- Build Collections ---
+chroma = chromadb.Client()
+
+fixed = chroma.create_collection(name="fixed_chunks")
+fixed_data = fixed_chunks(corpus)
+fixed.add(documents=fixed_data, ids=[f"fc_{i}" for i in range(len(fixed_data))])
+
+sentence = chroma.create_collection(name="sentence_chunks")
+sentence.add(documents=corpus, ids=[f"sc_{i}" for i in range(len(corpus))])
+
+print(f"Fixed chunks: {len(fixed_data)} chunks from {len(corpus)} documents")
+print(f"Sentence chunks: {len(corpus)} chunks")
+
+# --- Evaluation Queries ---
+eval_set = [
+    {"query": "How much does the Pro plan cost?", "expected_keywords": ["1,499", "Pro"]},
+    {"query": "What is the refund policy for enterprise customers?", "expected_keywords": ["90 days", "Enterprise", "prorated"]},
+    {"query": "Does CloudNest support Docker?", "expected_keywords": ["Docker", "Pro", "Enterprise"]},
+    {"query": "What databases are available?", "expected_keywords": ["MySQL", "PostgreSQL", "MongoDB"]},
+    {"query": "How do I delete my account?", "expected_keywords": ["privacy@cloudnest", "deletion"]},
+    {"query": "What is the uptime guarantee?", "expected_keywords": ["99.9%", "SLA"]},
+    {"query": "Where are the data centers located?", "expected_keywords": ["Mumbai", "Bangalore", "Singapore"]},
+    {"query": "What operating systems are supported?", "expected_keywords": ["Ubuntu", "CentOS", "Windows"]},
+    {"query": "How much bandwidth does the Starter plan get?", "expected_keywords": ["1 TB", "Starter"]},
+    {"query": "Is CloudNest GDPR compliant?", "expected_keywords": ["GDPR", "EU"]},
+]
+
+# --- Retrieval Quality Measurement ---
+def measure_retrieval(collection, eval_set, top_k=3, label=""):
+    hits = 0
+    for case in eval_set:
+        results = collection.query(query_texts=[case["query"]], n_results=top_k)
+        retrieved_text = " ".join(results["documents"][0])
+        found = any(kw.lower() in retrieved_text.lower() for kw in case["expected_keywords"])
+        if found:
+            hits += 1
+        print(f"  {'✓' if found else '✗'} {case['query'][:50]}...")
+    
+    score = hits / len(eval_set) * 100
+    print(f"\n  [{label}] Retrieval Hit Rate: {hits}/{len(eval_set)} ({score:.0f}%)\n")
+    return score
+
+print("\n--- Fixed-Size Chunking ---")
+fixed_score = measure_retrieval(fixed, eval_set, label="Fixed")
+
+print("--- Sentence-Level Chunking ---")
+sentence_score = measure_retrieval(sentence, eval_set, label="Sentence")
+
+print(f"Winner: {'Sentence' if sentence_score >= fixed_score else 'Fixed'}-level chunking")
+
+# --- Query Rewriting (Bonus) ---
+def rewrite_query(question):
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "Rewrite this search query to be more specific and detailed. Output ONLY the rewritten query."},
+            {"role": "user", "content": question}
+        ],
+        temperature=0.0
+    )
+    return resp.choices[0].message.content
+
+# Test query rewriting on a vague query
+vague_query = "refund?"
+print(f"\nOriginal query: '{vague_query}'")
+print(f"Rewritten query: '{rewrite_query(vague_query)}'")</code></pre>
+
+      <h3>5. Expected Output Sample</h3>
+      <pre><code>Fixed chunks: 25 chunks from 50 documents
+Sentence chunks: 50 chunks
+
+--- Fixed-Size Chunking ---
+  ✓ How much does the Pro plan cost?...
+  ✓ What is the refund policy for enterprise custom...
+  ✗ Does CloudNest support Docker?...
+  ✓ What databases are available?...
+  ✓ How do I delete my account?...
+  ✓ What is the uptime guarantee?...
+  ✓ Where are the data centers located?...
+  ✗ What operating systems are supported?...
+  ✓ How much bandwidth does the Starter plan get?...
+  ✓ Is CloudNest GDPR compliant?...
+
+  [Fixed] Retrieval Hit Rate: 8/10 (80%)
+
+--- Sentence-Level Chunking ---
+  ✓ How much does the Pro plan cost?...
+  ✓ What is the refund policy for enterprise custom...
+  ✓ Does CloudNest support Docker?...
+  ✓ What databases are available?...
+  ✓ How do I delete my account?...
+  ✓ What is the uptime guarantee?...
+  ✓ Where are the data centers located?...
+  ✓ What operating systems are supported?...
+  ✓ How much bandwidth does the Starter plan get?...
+  ✓ Is CloudNest GDPR compliant?...
+
+  [Sentence] Retrieval Hit Rate: 10/10 (100%)
+
+Winner: Sentence-level chunking
+
+Original query: 'refund?'
+Rewritten query: 'What is the refund policy and how do I request a refund for my subscription plan?'</code></pre>
+
+      <h3>6. Failure Scenario</h3>
+      <p>
+        Try using a very large fixed chunk size (group 10 documents per chunk, giving you only 5 chunks total). Run the evaluation again. Watch the hit rate drop because every chunk is a wall of text about 10 different topics — the embedding becomes a meaningless average of all those topics, and similarity search breaks down.
+      </p>
+
+      <h3>7. Extension Challenge (Optional)</h3>
+      <p>
+        Implement semantic chunking using the code from the Chunking Strategies section. Compare its retrieval hit rate against fixed-size and sentence-aware on the same evaluation set. Also measure the embedding API cost of semantic chunking vs the other strategies.
+      </p>
+
+      <h3>8. Reflection Prompts</h3>
+      <ol>
+        <li>Why does sentence-level chunking typically outperform fixed-size chunking for RAG retrieval? What happens to the embedding quality when a chunk mixes unrelated topics?</li>
+        <li>Query rewriting adds an extra LLM API call before retrieval. Under what conditions is this cost justified? When would you skip it?</li>
+      </ol>
+    </section>
+  </div>
+
+</body>
+</html>

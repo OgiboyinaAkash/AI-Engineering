@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>C2.6: Capstone: Production AI Assistant Design Review</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: monospace; padding: 12px; margin: 0; display: flex; gap: 24px; }
+    .toc { width: 220px; flex-shrink: 0; border-right: 1px solid #ccc; padding-right: 12px; }
+    .toc h3 { margin-top: 0; margin-bottom: 8px; }
+    .toc ul { list-style-type: none; padding-left: 0; margin-top: 0; margin-bottom: 20px; }
+    .toc li { margin-bottom: 8px; }
+    .main-content { flex-grow: 1; max-width: 80vw; }
+    code { display: block; background: #222; color: #eee; width: 80%; padding: 8px; overflow-x: auto; }
+    pre { background: #222; color: #eee; width: 80%; padding: 8px; margin: 0; overflow-x: auto; }
+    pre code { display: inline; background: none; color: inherit; padding: 0; width: auto; }
+    img { max-width: 80vw; }
+    hr { border: 0; border-top: 1px solid #ccc; margin: 24px 0; }
+    table { border-collapse: collapse; width: 80%; margin: 12px 0; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #eee; }
+  </style>
+</head>
+<body>
+
+  <div class="toc">
+    <h3>Track 1</h3>
+    <ul>
+      <li><a href="C1.1.html">C1.1: Fundamentals &amp; APIs</a></li>
+      <li><a href="C1.2.html">C1.2: Prompt Engineering</a></li>
+      <li><a href="C1.3.html">C1.3: Building with APIs</a></li>
+      <li><a href="C1.4.html">C1.4: Tool Use &amp; Function Calling</a></li>
+      <li><a href="C1.5.html">C1.5: RAG &amp; Knowledge Grounding</a></li>
+      <li><a href="C1.6.html">C1.6: Capstone</a></li>
+    </ul>
+    <h3>Track 2</h3>
+    <ul>
+      <li><a href="C2.1.html">C2.1: Production RAG</a></li>
+      <li><a href="C2.2.html">C2.2: Vector DBs &amp; Hybrid Search</a></li>
+      <li><a href="C2.3.html">C2.3: Agents &amp; ReAct</a></li>
+      <li><a href="C2.4.html">C2.4: Orchestration &amp; MCP</a></li>
+      <li><a href="C2.5.html">C2.5: Production APIs &amp; Security</a></li>
+      <li><a href="C2.6.html"><b>C2.6: Capstone: Design Review</b></a></li>
+    </ul>
+
+    <h3>On This Page</h3>
+    <ul>
+      <li><a href="#overview">1. Capstone Overview</a></li>
+      <li><a href="#requirements">2. Technical Requirements</a></li>
+      <li><a href="#deliverables">3. Portfolio Deliverables</a></li>
+      <li><a href="#design-review">4. Engineering Design Review</a></li>
+      <li><a href="#evaluation-rubric">5. Evaluation Rubric</a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <h1>Capstone: Production AI Assistant Design Review</h1>
+
+    <section id="overview">
+      <h2>1. Capstone Overview</h2>
+      <p>
+        This is the final test. You are tasked with building a <b>production-grade AI assistant</b> that combines everything you've learned in Track 2: robust RAG architecture, agentic tool calling, orchestration, API delivery, and rigorous evaluation.
+      </p>
+
+      <p>
+        In Track 1's capstone (C1.6), the focus was on making it <i>work</i>. Here, the focus is on making it <i>scale, defend itself, and prove its quality</i>.
+      </p>
+
+      <p>
+        You will build the system, package it, evaluate it using RAGAS, and defend your architectural choices in an Engineering Design Review.
+      </p>
+    </section>
+
+    <hr>
+
+    <section id="requirements">
+      <h2>2. Technical Requirements</h2>
+      <p>
+        Your system must meet the following mandatory requirements. Missing any of these will result in an automatic failure in the design review.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Requirement</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Data &amp; Retrieval</b></td>
+            <td>
+              - Minimum 100-document corpus (use the expanded dataset provided or your own).<br>
+              - Persistent Vector DB (ChromaDB or Pinecone).<br>
+              - Implement at least one metadata filter (e.g., date, category, author).<br>
+              - Implement a documented chunking strategy (justify your chunk size).
+            </td>
+          </tr>
+          <tr>
+            <td><b>Agentic Behavior</b></td>
+            <td>
+              - Orchestrate a multi-tool loop (ReAct pattern) or multi-agent workflow.<br>
+              - Include at least 3 distinct tools (e.g., semantic_search, web_search, calculate).<br>
+              - Implement hard loop limits (max_iterations) and decision logging.
+            </td>
+          </tr>
+          <tr>
+            <td><b>API &amp; Delivery</b></td>
+            <td>
+              - Expose the agent via an asynchronous FastAPI endpoint (<code>/ask</code>).<br>
+              - Implement request logging capturing tokens, cost, latency, and retrieved sources.<br>
+              - Output must be guarded by at least one structural or content guardrail.
+            </td>
+          </tr>
+          <tr>
+            <td><b>Security</b></td>
+            <td>
+              - Defend against basic prompt injection using delimiters or input filtering.<br>
+              - No secrets or API keys hardcoded in the repository.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr>
+
+    <section id="deliverables">
+      <h2>3. Portfolio Deliverables</h2>
+      <p>
+        Your GitHub repository must be structured professionally and contain the following artifacts:
+      </p>
+
+      <pre><code>production-ai-capstone/
+├── .env.example
+├── Dockerfile
+├── requirements.txt
+├── README.md                 # Setup instructions, architecture overview
+├── architecture.md           # Engineering design doc (justifying your choices)
+├── app/
+│   ├── main.py               # FastAPI application
+│   ├── agent.py              # ReAct loop or Orchestrator
+│   ├── tools/                # Tool implementations
+│   └── retrieval/            # Vector DB setup, chunking, embedding logic
+├── data/                     # Your corpus or script to download it
+└── evaluation/
+    ├── ragas_results.json    # Output from your RAGAS eval run
+    └── test_queries.json     # Labeled evaluation set (min 20 queries)</code></pre>
+    </section>
+
+    <hr>
+
+    <section id="design-review">
+      <h2>4. Engineering Design Review</h2>
+      <p>
+        The culmination of this capstone is a live or recorded Engineering Design Review with an SME (Subject Matter Expert). This simulates a real-world tech lead review.
+      </p>
+
+      <p>You must be prepared to answer questions such as:</p>
+      <ul>
+        <li><b>Architecture:</b> <i>"Walk me through the lifecycle of a request from the FastAPI endpoint down to the Vector DB and back."</i></li>
+        <li><b>Design Choices:</b> <i>"Why did you choose your specific chunk size and overlap? What happened when you tried a smaller chunk?"</i></li>
+        <li><b>Evaluation:</b> <i>"What was your RAGAS Faithfulness score? How did you improve it over the baseline?"</i></li>
+        <li><b>Safety:</b> <i>"Show me what happens if the LLM enters an infinite loop trying to call a broken tool."</i></li>
+        <li><b>Production:</b> <i>"How would this system behave if 1,000 users hit the endpoint simultaneously?"</i></li>
+      </ul>
+    </section>
+
+    <hr>
+
+    <section id="evaluation-rubric">
+      <h2>5. Evaluation Rubric</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Criteria</th>
+            <th>Pass</th>
+            <th>Needs Work</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>System Architecture</b></td>
+            <td>Clean separation of API, agent, and retrieval layers. Easily readable code.</td>
+            <td>Spaghetti code. Everything in one 800-line file.</td>
+          </tr>
+          <tr>
+            <td><b>Retrieval Quality</b></td>
+            <td>Metadata filtering is used. Justifiable chunking strategy. Recall@k metrics provided.</td>
+            <td>Blind chunking. No metrics. "It looks okay."</td>
+          </tr>
+          <tr>
+            <td><b>Agent Safety</b></td>
+            <td>Loop limits enforced. Decision logging implemented. High-risk tools require approval.</td>
+            <td>Agent can loop forever. Errors crash the system.</td>
+          </tr>
+          <tr>
+            <td><b>Evaluation</b></td>
+            <td>RAGAS evaluation run on ≥20 queries. Results analyzed and documented.</td>
+            <td>No formal evaluation. Tested manually on 3 questions.</td>
+          </tr>
+          <tr>
+            <td><b>Production Readiness</b></td>
+            <td>Async FastAPI. Cost and latency logged. Dockerized. Secrets managed via .env.</td>
+            <td>Sync endpoints blocking requests. Keys in repo.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        <b>Congratulations on reaching the end of the AI Engineering Series!</b> If you pass this design review, you have proven you can build, evaluate, and ship production-grade Applied AI systems.
+      </p>
+    </section>
+  </div>
+
+</body>
+</html>
