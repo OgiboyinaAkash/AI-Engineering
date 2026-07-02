@@ -1,0 +1,2 @@
+Title: Portfolio Diversification Theory
+Modern portfolio theory shows that diversification reduces unsystematic risk in a portfolio. Harry Markowitz demonstrated that combining uncorrelated assets lowers overall portfolio volatility. The efficient frontier represents portfolios with maximum return for each given risk level. Investors should hold a mix of equities, bonds, and alternatives to optimize the risk-return tradeoff.

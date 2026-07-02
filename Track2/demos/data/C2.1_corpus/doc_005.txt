@@ -1,0 +1,2 @@
+Title: Bond Duration and Interest Rate Risk
+Bond duration measures the sensitivity of a bond price to changes in interest rates. Longer-duration bonds experience greater price drops when market interest rates rise. Portfolio managers use duration matching to hedge interest rate risk in fixed-income portfolios. A bond with a duration of five years loses approximately five percent of value for each one-percent rate increase.

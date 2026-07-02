@@ -1,0 +1,2 @@
+Title: Liquidity Risk in Banking
+Liquidity risk is an institution inability to meet its short-term financial obligations when due. Banks maintain pools of liquid assets to fund unexpected deposit withdrawals without fire sales. The liquidity coverage ratio requires banks to hold high-quality liquid assets for a 30-day stress scenario. Bank runs occur when depositors lose confidence and simultaneously withdraw funds beyond available liquidity.

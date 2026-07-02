@@ -1,0 +1,13 @@
+{"query": "What stores embeddings locally on disk?", "relevance": {"c2_003": 2, "c2_004": 1}, "metadata_filter": {"category": "vector_db"}}
+{"query": "Which method combines keyword and vector retrieval?", "relevance": {"c2_006": 2, "c2_009": 1, "c2_010": 1}, "metadata_filter": {"category": "retrieval"}}
+{"query": "What scores a query and document together?", "relevance": {"c2_007": 2}, "metadata_filter": {"category": "retrieval"}}
+{"query": "Which metric rewards the first relevant hit?", "relevance": {"c2_008": 2}, "metadata_filter": {"category": "evaluation"}}
+{"query": "How do you improve concurrent API requests in Python?", "relevance": {"c2_001": 2, "c2_002": 1}, "metadata_filter": {"category": "python"}}
+{"query": "How should I filter documents by source, date, category, and author?", "relevance": {"c2_005": 2, "c2_012": 1}, "metadata_filter": {"category": "retrieval"}}
+{"query": "How does diversification reduce investment risk in a portfolio?", "relevance": {"c2_013": 2, "c2_014": 1}, "metadata_filter": {"category": "finance"}}
+{"query": "What financial metric divides net income by outstanding shares?", "relevance": {"c2_015": 2}, "metadata_filter": {"category": "finance"}}
+{"query": "How does inflation affect bond prices and interest rates?", "relevance": {"c2_016": 2, "c2_013": 1}, "metadata_filter": {"category": "finance"}}
+{"query": "What are the six levels of Bloom's taxonomy for learning objectives?", "relevance": {"c2_019": 2, "c2_022": 1}, "metadata_filter": {"category": "education"}}
+{"query": "How do adaptive learning platforms personalise lesson difficulty for students?", "relevance": {"c2_021": 2, "c2_023": 1}, "metadata_filter": {"category": "education"}}
+{"query": "How do clinical decision support systems recommend patient treatments?", "relevance": {"c2_024": 2, "c2_025": 1}, "metadata_filter": {"category": "healthcare"}}
+{"query": "What RAG techniques help extract obligations from legal contracts?", "relevance": {"c2_026": 2, "c2_027": 1}, "metadata_filter": {"category": "legal"}}

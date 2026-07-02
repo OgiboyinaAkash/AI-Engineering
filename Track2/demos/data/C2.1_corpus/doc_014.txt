@@ -1,0 +1,2 @@
+Title: Revenue Recognition Accounting
+Revenue recognition determines when a company records revenue in its financial statements. Under US GAAP revenue is recognized when it is earned and collectible, not simply when cash is received. The ASC 606 standard requires revenue to be recognized as contractual performance obligations are satisfied. Misapplied revenue recognition is a frequent source of financial restatements and regulatory enforcement.

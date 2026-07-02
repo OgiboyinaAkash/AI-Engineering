@@ -1,0 +1,2 @@
+Title: Loan Amortization Explained
+Loan amortization distributes equal monthly payments across the full loan term. Early payments are weighted heavily toward interest while later payments reduce principal. A 30-year mortgage at 6 percent APR has a fixed monthly payment calculated from the amortization formula. Borrowers who make extra principal payments shorten the loan term and reduce total interest paid.

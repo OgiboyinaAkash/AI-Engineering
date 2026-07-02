@@ -1,0 +1,2 @@
+Title: Financial Statement Analysis
+The income statement reports a company revenue, expenses, and net income over a reporting period. The balance sheet shows assets, liabilities, and shareholders equity at a single point in time. The cash flow statement tracks cash inflows and outflows from operations, investing, and financing activities. Analysts use all three statements together to assess a company overall financial health and sustainability.

@@ -1,0 +1,2 @@
+Title: Risk and Return in Capital Markets
+The risk-return tradeoff states that higher expected returns require the investor to accept higher risk. Equities historically earn higher returns than bonds but with substantially greater price volatility. Beta measures a stock sensitivity to market movements relative to a benchmark like the S&P 500. Investors position themselves on the risk-return spectrum based on their time horizon and risk tolerance.

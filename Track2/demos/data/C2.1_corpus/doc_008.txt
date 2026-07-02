@@ -1,0 +1,2 @@
+Title: Compound Interest and Long-Term Growth
+Compound interest earns returns on both the principal and all previously accumulated interest. The time value of money states that a dollar today is worth more than a dollar in the future. An investment of one thousand dollars at seven percent annual compound interest grows to about 7,612 dollars in 30 years. Starting to invest early dramatically increases the compounding effect over a long horizon.

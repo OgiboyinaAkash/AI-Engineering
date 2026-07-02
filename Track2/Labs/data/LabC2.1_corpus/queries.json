@@ -1,0 +1,32 @@
+[
+  {
+    "query": "Why do central banks raise interest rates?",
+    "answer": "control inflation",
+    "doc_id": 301
+  },
+  {
+    "query": "What measures bond price sensitivity to rate changes?",
+    "answer": "duration",
+    "doc_id": 301
+  },
+  {
+    "query": "What does Bloom's Taxonomy classify?",
+    "answer": "learning objectives",
+    "doc_id": 303
+  },
+  {
+    "query": "How does spaced repetition improve memory?",
+    "answer": "revisits information at increasing intervals",
+    "doc_id": 304
+  },
+  {
+    "query": "What do Electronic Health Records store?",
+    "answer": "medical histories, diagnoses",
+    "doc_id": 305
+  },
+  {
+    "query": "How do microservices decompose applications?",
+    "answer": "independently deployable services",
+    "doc_id": 306
+  }
+]

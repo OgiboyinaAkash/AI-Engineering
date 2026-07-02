@@ -1,0 +1,2 @@
+Title: Credit Scores and Lending Decisions
+Credit scores quantify a borrower likelihood of defaulting on a loan repayment. FICO scores range from 300 to 850 and are calculated from payment history, debt levels, and credit age. Lenders use credit scores to set loan approval thresholds and determine the applicable interest rate. A score above 750 typically qualifies borrowers for the best available rates from major lenders.

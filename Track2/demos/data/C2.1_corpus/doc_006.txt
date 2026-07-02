@@ -1,0 +1,2 @@
+Title: Options Contracts Calls and Puts
+A call option gives the buyer the right to purchase an asset at the strike price before expiry. A put option gives the buyer the right to sell an asset at the strike price before expiry. Options are used for hedging existing positions or speculating on directional price movements. The Black-Scholes model is the standard framework for pricing European options on non-dividend stocks.
